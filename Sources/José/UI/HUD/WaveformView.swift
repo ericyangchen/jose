@@ -30,10 +30,12 @@ struct WaveformView: View {
             }
             .frame(width: geo.size.width, height: height, alignment: .center)
         }
-        // Animation outlasts the inter-push interval (~250 ms) so the
-        // bars are always interpolating — never frozen mid-frame waiting
-        // for the next sample. easeOut feels like a VU meter snap.
-        .animation(.easeOut(duration: 0.22), value: levels)
+        // Linear easing + 180 ms duration overlaps the ~150 ms push
+        // interval. Bars are always mid-interpolation — no frozen
+        // gaps between pushes — and linear (vs. easeOut) keeps the
+        // motion continuous instead of feeling like a series of
+        // discrete settles.
+        .animation(.linear(duration: 0.18), value: levels)
     }
 
     // MARK: - Per-bar level lookup (right-aligned, newest at the right)

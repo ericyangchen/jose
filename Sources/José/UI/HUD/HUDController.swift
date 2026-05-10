@@ -183,13 +183,14 @@ final class HUDController {
 
     private func consumeLevels(_ stream: AsyncStream<Float>) {
         // Audio levels arrive at ~33 Hz (one per 30 ms chunk). Throttle
-        // to ~3.7 Hz — peak across each ~270 ms window. With 26 bars in
-        // the 130 pt pill, the waveform fills over ~7 s. The 220 ms
-        // easeOut animation runs alongside each push so adjacent
-        // samples blend continuously without stepping. Each individual
-        // bar drifts slowly enough that the eye can follow it, instead
-        // of feeling like a fast scroll.
-        let groupSize = 9
+        // to ~6.6 Hz — peak across each ~150 ms window. With 26 bars in
+        // the 130 pt pill, the waveform fills over ~4 s. The 180 ms
+        // *linear* animation (see WaveformView) is longer than the push
+        // interval, so consecutive samples are always interpolating —
+        // the eye never sees a frozen frame between updates. Linear
+        // (vs. easeOut) keeps motion continuous; easeOut introduced a
+        // small "settle" at every step that read as a jump.
+        let groupSize = 5
         levelTask = Task { [weak self] in
             var bucket: [Float] = []
             bucket.reserveCapacity(groupSize)
