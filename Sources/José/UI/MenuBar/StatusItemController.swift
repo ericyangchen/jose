@@ -4,13 +4,19 @@ import Observation
 
 /// Owns the `NSStatusItem`, drives icon repaints from `AppStateModel`, and
 /// hosts the dropdown menu. Spec §3.7 / §4.4.
+///
+/// Visibility model: rather than toggling `statusItem.isVisible`, we
+/// add/remove the underlying `NSStatusItem` itself. macOS treats a
+/// user-driven hide of `.removalAllowed` items as sticky — flipping
+/// `isVisible = true` after the fact often doesn't bring the icon back
+/// reliably. Removing and re-creating gives a clean, predictable transition.
 @MainActor
 final class StatusItemController {
     private let coordinator: AppCoordinator
     private let onOpenSettings: () -> Void
     private let onQuit: () -> Void
 
-    private let statusItem: NSStatusItem
+    private var statusItem: NSStatusItem?
     private let dropdown: DropdownMenu
 
     private var levelTask: Task<Void, Never>?
@@ -29,30 +35,17 @@ final class StatusItemController {
         self.coordinator = coordinator
         self.onOpenSettings = onOpenSettings
         self.onQuit = onQuit
-
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.dropdown = DropdownMenu(
             coordinator: coordinator,
             onOpenSettings: onOpenSettings,
             onQuit: onQuit
         )
 
-        statusItem.menu = dropdown.menu
-        statusItem.button?.image = StatusIcon.image(for: .idle)
-        statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.toolTip = "José"
+        if Settings.shared.showMenuBarIcon {
+            installStatusItem()
+        }
 
-        // Allow ⌘-drag to remove the status item from the menu bar. We
-        // don't include .terminationOnRemoval — the app keeps running so
-        // the user can re-show the icon from Settings → General.
-        statusItem.behavior = [.removalAllowed]
-
-        // Honor the saved visibility setting; sync any external change
-        // (user ⌘-dragged the icon out) back to Settings so the toggle
-        // and the actual menu-bar state never diverge.
-        statusItem.isVisible = Settings.shared.showMenuBarIcon
-        observeMenuBarVisibility()
-
+        armSettingsTracking()
         startObservingState()
     }
 
@@ -60,39 +53,61 @@ final class StatusItemController {
         levelTask?.cancel()
         animationTimer?.invalidate()
         visibilityObservation?.invalidate()
-        NSStatusBar.system.removeStatusItem(statusItem)
+        if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+        }
     }
 
-    // MARK: - Menu-bar visibility ↔ settings sync
+    // MARK: - Install / uninstall
 
-    /// KVO on the live `isVisible` from AppKit + observation tracking on
-    /// the user-facing Settings toggle. Either side can drive the other:
-    ///
-    /// - User flips the toggle in Settings → we update `statusItem.isVisible`.
-    /// - User ⌘-drags the icon off the menu bar → AppKit sets
-    ///   `isVisible = false`, our KVO catches it and writes through to
-    ///   `Settings.shared.showMenuBarIcon = false` so the toggle reflects
-    ///   reality.
-    ///
-    /// The branches both check whether the value actually differs before
-    /// writing — without that, they'd ping-pong endlessly.
-    private func observeMenuBarVisibility() {
-        visibilityObservation = statusItem.observe(\.isVisible, options: [.new]) { [weak self] _, change in
-            guard let self, let isVisible = change.newValue else { return }
+    private func installStatusItem() {
+        guard statusItem == nil else { return }
+
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.menu = dropdown.menu
+        item.button?.image = StatusIcon.image(for: .idle)
+        item.button?.imagePosition = .imageOnly
+        item.button?.toolTip = "José"
+        item.behavior = [.removalAllowed]
+
+        // KVO: if the user ⌘-drags the icon out of the menu bar, AppKit
+        // sets isVisible = false on the live item. Treat that as a true
+        // uninstall on our side too — actually remove the NSStatusItem
+        // and write the setting through, so re-toggling it on later
+        // creates a fresh, clean item.
+        visibilityObservation = item.observe(\.isVisible, options: [.new]) { [weak self] _, change in
+            guard let self, change.newValue == false else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if Settings.shared.showMenuBarIcon != isVisible {
-                    Logger.menubar.info("isVisible changed externally → \(isVisible); syncing setting")
-                    Settings.shared.showMenuBarIcon = isVisible
+                Logger.menubar.info("user removed status item via ⌘-drag — uninstalling")
+                self.uninstallStatusItem()
+                if Settings.shared.showMenuBarIcon {
+                    Settings.shared.showMenuBarIcon = false
                 }
             }
         }
 
-        // Mirror the other direction: setting → status item.
-        armSettingsTracking()
+        statusItem = item
+        renderedState = .idle
+        // Render the right initial frame for the current state.
+        handleStateChange()
     }
 
-    /// `withObservationTracking` is one-shot, so re-arm after each fire.
+    private func uninstallStatusItem() {
+        visibilityObservation?.invalidate()
+        visibilityObservation = nil
+        if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+        }
+        statusItem = nil
+    }
+
+    // MARK: - Settings ↔ menu-bar sync
+
+    /// `withObservationTracking` is one-shot — re-arm after each fire.
+    /// When the user flips Settings.showMenuBarIcon, install or uninstall
+    /// the NSStatusItem accordingly. This is the toggle path; the KVO
+    /// observation in `installStatusItem` handles the user-drag path.
     private func armSettingsTracking() {
         withObservationTracking {
             _ = Settings.shared.showMenuBarIcon
@@ -100,8 +115,10 @@ final class StatusItemController {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 let desired = Settings.shared.showMenuBarIcon
-                if self.statusItem.isVisible != desired {
-                    self.statusItem.isVisible = desired
+                if desired && self.statusItem == nil {
+                    self.installStatusItem()
+                } else if !desired && self.statusItem != nil {
+                    self.uninstallStatusItem()
                 }
                 self.armSettingsTracking()
             }
@@ -115,8 +132,6 @@ final class StatusItemController {
         handleStateChange()
     }
 
-    /// `withObservationTracking` is one-shot — it fires `onChange` exactly
-    /// once and then stops. We re-arm it after every state change.
     private func armObservation() {
         withObservationTracking {
             _ = self.coordinator.stateModel.state
@@ -147,7 +162,6 @@ final class StatusItemController {
     private func startRecordingAnimation() {
         animationTimer?.invalidate()
         latestLevel = 0
-        // 30 fps icon repaint.
         animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.updateIcon()
@@ -167,7 +181,6 @@ final class StatusItemController {
         animationTimer?.invalidate()
         spinnerPhase = 0
         levelTask?.cancel()
-        // Slower repaint for spinner — 24 fps is plenty.
         animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -189,6 +202,7 @@ final class StatusItemController {
     // MARK: - Render
 
     private func updateIcon() {
+        guard let statusItem else { return }  // icon hidden — skip render
         let next = currentIconState()
         if next != renderedState || isAnimated(next) {
             renderedState = next
