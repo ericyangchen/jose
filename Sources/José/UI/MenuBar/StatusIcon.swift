@@ -17,8 +17,9 @@ enum StatusIcon {
     static let size = CGSize(width: 22, height: 22)
 
     /// Renders the given state to an `NSImage` ready to assign to
-    /// `NSStatusItem.button.image`. Idle/recording/processing are template
-    /// images (system tints them); error keeps its red overlay.
+    /// `NSStatusItem.button.image`. Idle/processing are template images
+    /// (system tints them light/dark); recording uses the Siri gradient
+    /// (non-template); error keeps its red triangle overlay.
     static func image(for state: StatusIconState) -> NSImage {
         let renderer = ImageRenderer(
             content: StatusIconView(state: state)
@@ -28,8 +29,12 @@ enum StatusIcon {
         let image = renderer.nsImage ?? NSImage(size: size)
         image.size = size
         switch state {
-        case .error: image.isTemplate = false
-        default: image.isTemplate = true
+        case .recording, .error:
+            // Both keep their colors as-rendered: recording shows the
+            // Siri gradient bars, error keeps its red badge.
+            image.isTemplate = false
+        case .idle, .processing:
+            image.isTemplate = true
         }
         return image
     }
@@ -42,17 +47,27 @@ private struct StatusIconView: View {
         Canvas { context, canvasSize in
             switch state {
             case .idle:
-                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45])
+                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45], colors: nil)
             case .recording(let level):
-                drawBars(context: context, size: canvasSize, levels: recordingLevels(for: level))
+                drawBars(context: context, size: canvasSize, levels: recordingLevels(for: level), colors: Self.siriBarColors)
             case .processing(let phase):
                 drawSpinner(context: context, size: canvasSize, phase: phase)
             case .error:
-                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45])
+                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45], colors: nil)
                 drawErrorOverlay(context: context, size: canvasSize)
             }
         }
     }
+
+    /// Three bars sampled from the four-stop Siri gradient (pink → purple
+    /// → blue → cyan) at t = 0, 0.5, 1.0. Used for the recording state so
+    /// the menu-bar icon picks up the same chromatic identity as the HUD
+    /// halo.
+    private static let siriBarColors: [Color] = [
+        Color(red: 0.949, green: 0.659, blue: 0.769),  // pink (t=0)
+        Color(red: 0.635, green: 0.698, blue: 0.910),  // purple→blue interp (t=0.5)
+        Color(red: 0.584, green: 0.863, blue: 0.875)   // cyan (t=1)
+    ]
 
     private func recordingLevels(for level: Float) -> [Double] {
         let l = max(0.0, min(1.0, Double(level)))
@@ -63,7 +78,11 @@ private struct StatusIconView: View {
         return [outerA, middle, outerB]
     }
 
-    private func drawBars(context: GraphicsContext, size: CGSize, levels: [Double]) {
+    /// `colors` of nil means template-style fill (`.primary`) — system
+    /// tints to white/black per menu bar mode. Pass a 3-color array to
+    /// paint each bar individually (used for the Siri-gradient recording
+    /// state, which is rendered non-template).
+    private func drawBars(context: GraphicsContext, size: CGSize, levels: [Double], colors: [Color]?) {
         let barCount = 3
         let barWidth: CGFloat = 3
         let spacing: CGFloat = 2
@@ -79,7 +98,8 @@ private struct StatusIconView: View {
             let y = centerY - h / 2
             let rect = CGRect(x: x, y: y, width: barWidth, height: h)
             let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-            context.fill(path, with: .color(.primary))
+            let fill: Color = (colors?[i]) ?? .primary
+            context.fill(path, with: .color(fill))
         }
     }
 
