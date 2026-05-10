@@ -132,12 +132,24 @@ final class AppCoordinator: HotkeyManagerDelegate {
                 stateModel.transition(to: .idle)
                 return
             }
+            // After the await, the user may have released the hotkey
+            // already; re-check before starting the engine.
+            guard case .arming = stateModel.state else { return }
         }
 
         do {
             try await audioEngine.start()
+            // Engine start can take 50–200 ms; the user might have released
+            // (or pressed Esc) during that await. If state is no longer
+            // .arming, we have no way to stop the engine via the normal
+            // path (no further .up event will arrive), so cancel here.
+            guard case .arming = stateModel.state else {
+                Logger.coordinator.debug("state changed during audio start — cancelling")
+                await audioEngine.cancel()
+                return
+            }
             stateModel.transition(to: .recording(slot: slot, since: .now))
-            hud?.show(.recording(audioLevels: audioEngine.audioLevelStream))
+            hud?.show(.recording(audioLevels: audioEngine.makeLevelStream()))
             scheduleSoftLimit(slot: slot)
             scheduleHardLimit(slot: slot)
         } catch {
@@ -207,6 +219,12 @@ final class AppCoordinator: HotkeyManagerDelegate {
             await outputRouter.deliver(text: text, action: slot.action)
             stateModel.transition(to: .idle)
             hud?.hide()
+        } catch is CancellationError {
+            // User pressed Esc during processing. cancel() already drove the
+            // HUD to .notice("Cancelled") and returned the state machine to
+            // idle — bail without overriding it with an error.
+            try? FileManager.default.removeItem(at: audioURL)
+            return
         } catch let error as TranscriptionError {
             // Keep the m4a around so the user can manually retry the failed
             // upload (per spec §3.6 — m4a stays until next success).
@@ -260,7 +278,7 @@ final class AppCoordinator: HotkeyManagerDelegate {
                 Task { @MainActor [weak self] in
                     try? await Task.sleep(for: .seconds(2))
                     guard let self, case .recording = self.stateModel.state else { return }
-                    self.hud?.show(.recording(audioLevels: self.audioEngine.audioLevelStream))
+                    self.hud?.show(.recording(audioLevels: self.audioEngine.makeLevelStream()))
                 }
             }
         }

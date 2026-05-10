@@ -51,7 +51,25 @@ enum AudioEngineError: LocalizedError {
 final class AudioEngine {
     // MARK: - Public surface
 
-    private(set) var audioLevelStream: AsyncStream<Float>
+    /// Vends a fresh single-consumer stream of normalized RMS levels
+    /// (0...1, ~33 Hz). Each call returns a new AsyncStream; the engine
+    /// fans out every level value to every active subscriber so the HUD,
+    /// menu-bar icon, and any future consumer can each iterate their own
+    /// stream without splitting samples between them.
+    func makeLevelStream() -> AsyncStream<Float> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(8)) { continuation in
+            let id = UUID()
+            audioQueue.async { [weak self] in
+                self?.state.levelSubscribers[id] = continuation
+            }
+            continuation.onTermination = { @Sendable [weak self] _ in
+                self?.audioQueue.async { [weak self] in
+                    self?.state.levelSubscribers.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
     var hadSpeech: Bool {
         audioQueue.sync {
             guard let vad = state.vad else { return false }
@@ -63,7 +81,6 @@ final class AudioEngine {
 
     private nonisolated(unsafe) var state = State()
     private nonisolated let audioQueue = DispatchQueue(label: "com.eric.jose.audio", qos: .userInteractive)
-    private nonisolated(unsafe) var levelContinuation: AsyncStream<Float>.Continuation
 
     private struct State {
         var engine: AVAudioEngine?
@@ -74,16 +91,20 @@ final class AudioEngine {
         var vad: SileroVAD?
         var levels: AudioLevelMonitor?
         var isRunning = false
+        /// Active subscribers to the level stream — keyed by the
+        /// per-stream UUID so unsubscribe (onTermination) can find its row.
+        var levelSubscribers: [UUID: AsyncStream<Float>.Continuation] = [:]
     }
 
     // MARK: - Init
 
-    init() {
-        var continuation: AsyncStream<Float>.Continuation!
-        self.audioLevelStream = AsyncStream(bufferingPolicy: .bufferingNewest(8)) { c in
-            continuation = c
+    init() {}
+
+    private nonisolated func broadcastLevel(_ level: Float) {
+        // Always called on audioQueue (from the audio tap callback).
+        for continuation in state.levelSubscribers.values {
+            continuation.yield(level)
         }
-        self.levelContinuation = continuation
     }
 
     // MARK: - Public API
@@ -156,7 +177,7 @@ final class AudioEngine {
 
         let vad = SileroVAD()
         let levels = AudioLevelMonitor { [weak self] level in
-            self?.levelContinuation.yield(level)
+            self?.broadcastLevel(level)
         }
 
         // Tap on the input node in its native format; conversion happens

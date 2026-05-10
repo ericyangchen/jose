@@ -96,7 +96,7 @@ final class StatusItemController {
             }
         }
         levelTask?.cancel()
-        let stream = coordinator.audioEngine.audioLevelStream
+        let stream = coordinator.audioEngine.makeLevelStream()
         levelTask = Task { [weak self] in
             for await level in stream {
                 guard !Task.isCancelled else { return }
