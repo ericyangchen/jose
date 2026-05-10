@@ -1,23 +1,24 @@
-"""Convert silero_vad.onnx to a Core ML model.
+"""Convert Silero VAD to a Core ML model.
 
 Usage:
-    python3 convert_silero.py <silero_vad.onnx> <output.mlmodel>
+    python3 convert_silero.py <silero_vad.{onnx,jit}> <output.mlmodel>
 
-The Silero VAD ONNX exposes:
-    inputs:
-        input  : float32 tensor [batch=1, samples=N]   audio waveform
-        state  : float32 tensor [2, batch=1, 128]      previous LSTM h+c
-        sr     : int64                                  sample rate (16000)
-    outputs:
-        output : float32 tensor [batch=1, 1]           speech probability
-        stateN : float32 tensor [2, batch=1, 128]      next LSTM h+c
+coremltools 8.x dropped direct ONNX conversion, so we prefer the
+torchscript (.jit) path that Silero also publishes:
 
-We expose them as fixed-shape inputs/outputs so the Swift inference loop can
-thread the LSTM state across calls without dynamic-shape gymnastics.
+    https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.jit
 
-Tested with coremltools 8.x. If the converter emits warnings about ONNX op
-versions, that's expected — Silero uses a small enough op set that the
-default conversion pipeline handles it.
+Inputs:
+    audio_chunk : float32 tensor [1, 512]   16kHz mono audio chunk
+    state       : float32 tensor [2, 1, 128]  prior LSTM h+c (zero on first call)
+    sr          : int64                       sample rate (16000)
+Outputs:
+    speech_prob : float32 tensor [1, 1]    speech probability
+    next_state  : float32 tensor [2, 1, 128]  next LSTM state
+
+If `.jit` fails (e.g. ScriptModule contains ops the converter doesn't
+support), we fall back to RMS-pseudo-VAD at runtime — see
+`SileroVAD.swift`.
 """
 
 from __future__ import annotations
@@ -28,32 +29,39 @@ from pathlib import Path
 import numpy as np
 
 
-def convert(onnx_path: Path, mlmodel_path: Path) -> None:
+def convert_jit(jit_path: Path, mlmodel_path: Path) -> None:
+    import torch
     import coremltools as ct
-    import onnx
 
-    print(f"Loading ONNX from {onnx_path}...")
-    onnx_model = onnx.load(str(onnx_path))
-    onnx.checker.check_model(onnx_model)
+    print(f"Loading torchscript from {jit_path}...")
+    model = torch.jit.load(str(jit_path))
+    model.eval()
 
-    # The model expects an audio chunk of 512 samples at 16kHz (Silero v5 default).
-    # We fix the shape so Core ML can compile to a static graph.
     chunk_samples = 512
+    example_audio = torch.zeros(1, chunk_samples, dtype=torch.float32)
+    example_state = torch.zeros(2, 1, 128, dtype=torch.float32)
+    example_sr = torch.tensor(16000, dtype=torch.int64)
 
-    # coremltools >= 7 supports ONNX via the unified converter (`ct.convert`)
-    # using the ONNX frontend. Shape inference is needed for the LSTM state.
-    inputs = [
-        ct.TensorType(name="input", shape=(1, chunk_samples), dtype=np.float32),
-        ct.TensorType(name="state", shape=(2, 1, 128), dtype=np.float32),
-        ct.TensorType(name="sr", shape=(1,), dtype=np.int64),
-    ]
+    print("Tracing with example inputs...")
+    with torch.no_grad():
+        traced = torch.jit.trace(
+            model, (example_audio, example_state, example_sr), strict=False
+        )
 
     print("Running coremltools converter...")
     mlmodel = ct.convert(
-        onnx_model,
-        inputs=inputs,
+        traced,
+        inputs=[
+            ct.TensorType(name="audio_chunk", shape=(1, chunk_samples), dtype=np.float32),
+            ct.TensorType(name="state", shape=(2, 1, 128), dtype=np.float32),
+            ct.TensorType(name="sr", shape=(1,), dtype=np.int32),
+        ],
+        outputs=[
+            ct.TensorType(name="speech_prob"),
+            ct.TensorType(name="next_state"),
+        ],
         convert_to="mlprogram",
-        compute_precision=ct.precision.FLOAT16,
+        compute_precision=ct.precision.FLOAT32,
         minimum_deployment_target=ct.target.macOS14,
     )
 
@@ -62,7 +70,7 @@ def convert(onnx_path: Path, mlmodel_path: Path) -> None:
         "Inputs: 16 kHz audio chunk (512 samples), prior LSTM state, sample rate. "
         "Outputs: speech probability, next LSTM state."
     )
-    mlmodel.author = "Silero Team — converted for José by Eric Chen"
+    mlmodel.author = "Silero Team — converted for José"
     mlmodel.license = "MIT"
 
     print(f"Saving {mlmodel_path}...")
@@ -75,16 +83,24 @@ def main() -> int:
         print(__doc__, file=sys.stderr)
         return 2
 
-    onnx_path = Path(sys.argv[1])
-    mlmodel_path = Path(sys.argv[2])
-    if not onnx_path.exists():
-        print(f"error: {onnx_path} does not exist", file=sys.stderr)
+    src = Path(sys.argv[1])
+    dst = Path(sys.argv[2])
+    if not src.exists():
+        print(f"error: {src} does not exist", file=sys.stderr)
         return 1
-    mlmodel_path.parent.mkdir(parents=True, exist_ok=True)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+
+    if src.suffix.lower() != ".jit":
+        print(f"error: only .jit (torchscript) input is supported by this script.", file=sys.stderr)
+        print(f"hint:  curl -fL -o silero_vad.jit \\", file=sys.stderr)
+        print(f"          https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.jit", file=sys.stderr)
+        return 1
 
     try:
-        convert(onnx_path, mlmodel_path)
+        convert_jit(src, dst)
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         print(f"error: conversion failed: {exc}", file=sys.stderr)
         return 1
     return 0
