@@ -21,9 +21,11 @@ final class HUDController {
 
     private let bottomMargin: CGFloat = 120
     /// Inner pill height. The window is bigger by 2× haloBleed so the
-    /// gradient glow has room to extend past the pill edge.
+    /// gradient glow has a tiny halo of empty pixels to fade into.
+    /// Smaller bleed keeps the soft bloom from reaching the rectangular
+    /// window edge (which would clip it and make the corners look square).
     private let height: CGFloat = 36
-    private static let haloBleed: CGFloat = 8
+    private static let haloBleed: CGFloat = 3
 
     init() {}
 

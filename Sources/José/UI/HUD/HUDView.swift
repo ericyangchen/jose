@@ -38,9 +38,10 @@ struct HUDView: View {
     @Bindable var model: HUDViewModel
 
     /// The visible pill is smaller than the panel — the surrounding gap
-    /// is where the SiriHalo's blurred glow can bleed without being
-    /// clipped by the window edge.
-    static let haloBleed: CGFloat = 8
+    /// is where the SiriHalo's soft bloom can fade. Kept small (3pt) so
+    /// the bloom never reaches the rectangular window edge — that was
+    /// what previously made the halo look like a square.
+    static let haloBleed: CGFloat = 3
 
     var body: some View {
         ZStack {
@@ -142,46 +143,39 @@ struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-/// Siri-style chromatic halo around the pill. Two layered capsule strokes
-/// painted with an angular gradient that rotates continuously, plus a
-/// blurred outer glow for the "floating" feel — same vibe as the Siri
-/// orb on iPhone or the Apple Intelligence frame.
+/// Siri-style chromatic ring around the pill. A thin angular-gradient stroke
+/// hugging the capsule edge with a small soft bloom — the bloom stays
+/// inside the pill bleed area so the rectangular window boundary never
+/// clips it (clipping was producing visible square corners).
 private struct SiriHalo: View {
     private static let stops: [Color] = [
         Color(red: 0.949, green: 0.659, blue: 0.769),
         Color(red: 0.710, green: 0.659, blue: 0.910),
         Color(red: 0.561, green: 0.737, blue: 0.910),
         Color(red: 0.584, green: 0.863, blue: 0.875),
-        Color(red: 0.949, green: 0.659, blue: 0.769),  // wrap back so the rotation is seamless
+        Color(red: 0.949, green: 0.659, blue: 0.769),  // wrap so rotation seams cleanly
     ]
 
     var body: some View {
         TimelineView(.animation) { context in
-            // 360° every ~3.5s. Slow enough to feel ambient, fast enough
-            // that you can see the colors moving.
             let phase = context.date.timeIntervalSinceReferenceDate
                 .truncatingRemainder(dividingBy: 3.5) / 3.5
             let angle = Angle.degrees(phase * 360)
+            let gradient = AngularGradient(colors: Self.stops, center: .center, angle: angle)
 
             ZStack {
-                // Outer glow — bigger, blurred, lower opacity. Sits behind
-                // the pill silhouette and bleeds out.
+                // Soft bloom — thin stroke, small blur, low opacity. Stays
+                // tight to the capsule edge so it never reaches the
+                // rectangular window boundary.
                 Capsule()
-                    .strokeBorder(
-                        AngularGradient(colors: Self.stops, center: .center, angle: angle),
-                        lineWidth: 4
-                    )
-                    .blur(radius: 8)
-                    .opacity(0.85)
-                    .padding(-2)
+                    .strokeBorder(gradient, lineWidth: 2)
+                    .blur(radius: 2)
+                    .opacity(0.55)
 
-                // Crisp ring on the pill edge.
+                // Crisp colored ring on the pill edge.
                 Capsule()
-                    .strokeBorder(
-                        AngularGradient(colors: Self.stops, center: .center, angle: angle),
-                        lineWidth: 1.2
-                    )
-                    .opacity(0.95)
+                    .strokeBorder(gradient, lineWidth: 1)
+                    .opacity(0.85)
             }
         }
     }
