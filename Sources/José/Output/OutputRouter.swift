@@ -21,12 +21,12 @@ final class OutputRouter {
         }
 
         if action == .pasteAndCopy {
-            if !PasteSimulator.isAuthorized {
-                // Re-issue the prompt so the user has a one-click path to
-                // System Settings → Privacy & Security → Accessibility,
-                // even if they dismissed the launch-time dialog.
-                PasteSimulator.requestAuthorizationPrompt()
-            }
+            // No re-prompting here — AppDelegate fires the system prompt
+            // once at launch when AX isn't trusted. Re-prompting per paste
+            // popped the dialog every transcribe even when permission was
+            // already granted (debug builds change signature per rebuild,
+            // so AXIsProcessTrusted reports false despite the Settings
+            // toggle being on; user has to re-grant after each rebuild).
             try? await Task.sleep(for: .milliseconds(30))
             PasteSimulator.send()
         }
