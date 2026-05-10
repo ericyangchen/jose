@@ -19,7 +19,7 @@ ZIP_PATH="$BUILD_DIR/José-${VERSION}.zip"
 mkdir -p "$BUILD_DIR"
 rm -rf "$ARCHIVE_PATH" "$EXPORT_PATH" "$ZIP_PATH"
 
-echo "Archiving (unsigned)..."
+echo "Archiving..."
 xcodebuild \
     -project José.xcodeproj \
     -scheme José \
@@ -32,6 +32,25 @@ xcodebuild \
 
 mkdir -p "$EXPORT_PATH"
 cp -R "$ARCHIVE_PATH/Products/Applications/José.app" "$EXPORT_PATH/"
+
+# Re-sign ad-hoc with a stable, bundle-id-matching identifier.
+# CODE_SIGNING_ALLOWED=NO above produces a "linker-signed" binary with
+# Identifier=José (just the executable name) and an unbound Info.plist.
+# macOS TCC keys permission grants by (bundle id, code signature) — with
+# a wrong identifier and unbound Info.plist, the OS treats every launch
+# as a fresh app, so Microphone / Accessibility grants don't stick and
+# the user gets re-prompted forever. Re-signing with --identifier =
+# bundle id, --options runtime, and the project's entitlements gives the
+# bundle a coherent identity TCC will actually persist grants against.
+echo "Re-signing ad-hoc with stable identifier..."
+codesign --force --deep --sign - \
+    --identifier com.eric.jose \
+    --options runtime \
+    --entitlements Resources/José.entitlements \
+    "$EXPORT_PATH/José.app"
+
+echo "Verifying..."
+codesign --verify --deep --strict --verbose=2 "$EXPORT_PATH/José.app"
 
 echo "Zipping..."
 cd "$EXPORT_PATH"
