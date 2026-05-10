@@ -1,8 +1,6 @@
 # José
 
 > **Hold and Say.** A native macOS dictation app for engineers who code-switch.
->
-> _名稱由來：José 的西班牙語發音 "Ho-Say" 即為 "Hold and Say"。_
 
 `José` is a menu-bar dictation app tuned for software engineers who frequently mix Traditional Chinese and English in the same sentence. Hold a hotkey, talk, release — your transcript is pasted at the cursor. Backed by OpenAI `gpt-4o-transcribe`. Bring your own key.
 
