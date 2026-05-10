@@ -43,6 +43,17 @@ struct GeneralPane: View {
 
             SettingsCard("Menu Bar") {
                 SettingsRow(
+                    "Show menu-bar icon",
+                    description: "If you ⌘-drag the icon out of the menu bar, this toggle flips off automatically."
+                ) {
+                    Toggle("", isOn: $settings.showMenuBarIcon)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                Divider()
+
+                SettingsRow(
                     "Show usage in dropdown",
                     description: "Displays this month's transcription minutes and estimated cost."
                 ) {

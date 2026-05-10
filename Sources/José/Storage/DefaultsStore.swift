@@ -4,6 +4,7 @@ enum DefaultsKey: String {
     case launchAtLogin = "general.launchAtLogin"
     case showInDock = "general.showInDock"
     case showUsageInMenuBar = "general.showUsageInMenuBar"
+    case showMenuBarIcon = "general.showMenuBarIcon"
 
     case hotkeyAMode = "hotkey.A.mode"
     case hotkeyBMode = "hotkey.B.mode"

@@ -73,6 +73,9 @@ final class Settings {
     var showUsageInMenuBar: Bool {
         didSet { Defaults.set(showUsageInMenuBar, for: .showUsageInMenuBar) }
     }
+    var showMenuBarIcon: Bool {
+        didSet { Defaults.set(showMenuBarIcon, for: .showMenuBarIcon) }
+    }
 
     // MARK: Hotkey modes (the actual key bindings are owned by the
     // KeyboardShortcuts library + a separate ModifierHotkey store).
@@ -147,6 +150,7 @@ final class Settings {
         self.launchAtLogin = Defaults.bool(for: .launchAtLogin) ?? false
         self.showInDock = Defaults.bool(for: .showInDock) ?? false
         self.showUsageInMenuBar = Defaults.bool(for: .showUsageInMenuBar) ?? true
+        self.showMenuBarIcon = Defaults.bool(for: .showMenuBarIcon) ?? true
 
         self.hotkeyAMode = Defaults.string(for: .hotkeyAMode)
             .flatMap(HotkeyMode.init(rawValue:)) ?? .hold

@@ -15,6 +15,7 @@ final class StatusItemController {
 
     private var levelTask: Task<Void, Never>?
     private var animationTimer: Timer?
+    private var visibilityObservation: NSKeyValueObservation?
 
     private var latestLevel: Float = 0
     private var spinnerPhase: Double = 0
@@ -41,13 +42,70 @@ final class StatusItemController {
         statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.toolTip = "José"
 
+        // Allow ⌘-drag to remove the status item from the menu bar. We
+        // don't include .terminationOnRemoval — the app keeps running so
+        // the user can re-show the icon from Settings → General.
+        statusItem.behavior = [.removalAllowed]
+
+        // Honor the saved visibility setting; sync any external change
+        // (user ⌘-dragged the icon out) back to Settings so the toggle
+        // and the actual menu-bar state never diverge.
+        statusItem.isVisible = Settings.shared.showMenuBarIcon
+        observeMenuBarVisibility()
+
         startObservingState()
     }
 
     deinit {
         levelTask?.cancel()
         animationTimer?.invalidate()
+        visibilityObservation?.invalidate()
         NSStatusBar.system.removeStatusItem(statusItem)
+    }
+
+    // MARK: - Menu-bar visibility ↔ settings sync
+
+    /// KVO on the live `isVisible` from AppKit + observation tracking on
+    /// the user-facing Settings toggle. Either side can drive the other:
+    ///
+    /// - User flips the toggle in Settings → we update `statusItem.isVisible`.
+    /// - User ⌘-drags the icon off the menu bar → AppKit sets
+    ///   `isVisible = false`, our KVO catches it and writes through to
+    ///   `Settings.shared.showMenuBarIcon = false` so the toggle reflects
+    ///   reality.
+    ///
+    /// The branches both check whether the value actually differs before
+    /// writing — without that, they'd ping-pong endlessly.
+    private func observeMenuBarVisibility() {
+        visibilityObservation = statusItem.observe(\.isVisible, options: [.new]) { [weak self] _, change in
+            guard let self, let isVisible = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if Settings.shared.showMenuBarIcon != isVisible {
+                    Logger.menubar.info("isVisible changed externally → \(isVisible); syncing setting")
+                    Settings.shared.showMenuBarIcon = isVisible
+                }
+            }
+        }
+
+        // Mirror the other direction: setting → status item.
+        armSettingsTracking()
+    }
+
+    /// `withObservationTracking` is one-shot, so re-arm after each fire.
+    private func armSettingsTracking() {
+        withObservationTracking {
+            _ = Settings.shared.showMenuBarIcon
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let desired = Settings.shared.showMenuBarIcon
+                if self.statusItem.isVisible != desired {
+                    self.statusItem.isVisible = desired
+                }
+                self.armSettingsTracking()
+            }
+        }
     }
 
     // MARK: - State observation

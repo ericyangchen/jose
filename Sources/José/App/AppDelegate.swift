@@ -64,14 +64,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.coordinator.onboardingFinished()
             self?.requestAllPermissionsAtLaunch(isFirstLaunch: isFirstLaunch)
 
-            // First-time users land in Settings right after the BYOK flow
-            // so they can rebind the hotkey, pick a model, etc. before
-            // they go hunting for it. Returning users skip — Settings is
-            // a click away in the menu-bar dropdown.
-            if isFirstLaunch {
-                self?.settingsWindow.show()
-            }
+            // Opening the .app should open Settings — even for returning
+            // users. José is menu-bar-only with no Dock icon, so without
+            // this every relaunch produced no visible UI and the user
+            // had no idea anything happened.
+            self?.settingsWindow.show()
         }
+    }
+
+    /// Called when the user re-opens the .app while José is already
+    /// running (double-clicking the bundle in Finder, opening from
+    /// Spotlight, etc.). For a menu-bar-only LSUIElement app there are
+    /// no windows to bring forward by default, so the relaunch would
+    /// otherwise be a no-op. Show Settings instead — that's the user's
+    /// way of "opening" the app.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        settingsWindow?.show()
+        return true
     }
 
     /// Request mic + Accessibility upfront so the user hits all the system
