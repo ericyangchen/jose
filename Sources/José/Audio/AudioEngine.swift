@@ -98,7 +98,19 @@ final class AudioEngine {
 
     // MARK: - Init
 
-    init() {}
+    init() {
+        // Pre-warm the SileroVAD instance on the audio queue so the
+        // ~400 ms Core ML model load doesn't sit in front of every
+        // recording. By the time the user presses a hotkey for the
+        // first time, this background task is almost certainly done.
+        // We keep the same instance alive across recordings and just
+        // reset its LSTM state between sessions.
+        audioQueue.async { [self] in
+            if state.vad == nil {
+                state.vad = SileroVAD()
+            }
+        }
+    }
 
     private nonisolated func broadcastLevel(_ level: Float) {
         // Always called on audioQueue (from the audio tap callback).
@@ -175,7 +187,15 @@ final class AudioEngine {
             throw AudioEngineError.recorderInitFailed(error)
         }
 
-        let vad = SileroVAD()
+        // Reuse the pre-warmed VAD; reset its state so leftover speech
+        // counters from the previous recording don't leak into this one.
+        // If init's pre-warm task hasn't finished yet (rare), create one
+        // here as a fallback — paying the model load cost only this once.
+        if state.vad == nil {
+            state.vad = SileroVAD()
+        }
+        let vad = state.vad!
+        vad.reset()
         let levels = AudioLevelMonitor { [weak self] level in
             self?.broadcastLevel(level)
         }
@@ -205,7 +225,7 @@ final class AudioEngine {
         state.converterInputFormat = inputFormat
         state.converterOutputFormat = outputFormat
         state.recorder = recorder
-        state.vad = vad
+        // state.vad is already set (reused from pre-warm or fallback above).
         state.levels = levels
         state.isRunning = true
 
