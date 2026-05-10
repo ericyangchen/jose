@@ -20,13 +20,12 @@ struct WaveformView: View {
             let totalSpacing = spacing * CGFloat(barCount - 1)
             let barWidth = max(1.5, (geo.size.width - totalSpacing) / CGFloat(barCount))
             let height = geo.size.height
-            let baseline = max(2, height * 0.12)
 
             HStack(alignment: .center, spacing: spacing) {
                 ForEach(0..<barCount, id: \.self) { index in
                     Capsule(style: .continuous)
                         .fill(color(at: index))
-                        .frame(width: barWidth, height: barHeight(at: index, max: height, baseline: baseline))
+                        .frame(width: barWidth, height: barHeight(at: index, max: height))
                 }
             }
             .frame(width: geo.size.width, height: height, alignment: .center)
@@ -47,10 +46,13 @@ struct WaveformView: View {
         return levels[mapped]
     }
 
-    private func barHeight(at index: Int, max maxHeight: CGFloat, baseline: CGFloat) -> CGFloat {
+    private func barHeight(at index: Int, max maxHeight: CGFloat) -> CGFloat {
         let value = level(at: index)
+        // No baseline floor — silence renders as zero-height (invisible)
+        // bars instead of a fake idle waveform. The user wants the
+        // visualization to be honest: no voice → no bars.
         let scaled = CGFloat(value) * maxHeight
-        return min(maxHeight, max(baseline, scaled))
+        return min(maxHeight, max(0, scaled))
     }
 
     // MARK: - Per-bar color (precomputed Siri-gradient sample by position)
