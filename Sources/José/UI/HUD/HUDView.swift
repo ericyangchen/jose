@@ -129,12 +129,7 @@ struct HUDView: View {
     }
 
     private var processingContent: some View {
-        // No outer padding — the processing pill is square (~36×36) and
-        // any horizontal padding squashes the indeterminate ProgressView
-        // into a clipped sliver. Centered in the parent ZStack.
-        ProgressView()
-            .controlSize(.small)
-            .progressViewStyle(.circular)
+        ProcessingDots()
     }
 
     private func messageContent(_ message: String, color: Color) -> some View {
@@ -151,6 +146,35 @@ struct HUDView: View {
         let m = total / 60
         let s = total % 60
         return String(format: "%d:%02d", m, s)
+    }
+}
+
+/// Three sequentially-pulsing dots — the "thinking" indicator shown while
+/// transcription is in flight. Each dot fades + scales between a dim and
+/// fully-bright state with a 0.16 s stagger, ~0.55 s half-cycle, looping
+/// forever. The animation is driven by a single State toggle inside an
+/// `.animation(.easeInOut.repeatForever(autoreverses: true))` so SwiftUI
+/// handles the easing — no TimelineView or per-frame redraw work.
+private struct ProcessingDots: View {
+    @State private var animating = false
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { i in
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: 5, height: 5)
+                    .opacity(animating ? 1.0 : 0.32)
+                    .scaleEffect(animating ? 1.0 : 0.55)
+                    .animation(
+                        .easeInOut(duration: 0.55)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(i) * 0.16),
+                        value: animating
+                    )
+            }
+        }
+        .onAppear { animating = true }
     }
 }
 

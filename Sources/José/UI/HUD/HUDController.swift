@@ -263,8 +263,10 @@ final class HUDController {
         case .recording:
             return NSSize(width: 130 + bleed, height: height + bleed)
         case .processing:
-            // Tiny circular spinner puck — width = height for a true circle.
-            return NSSize(width: height + bleed, height: height + bleed)
+            // Small horizontal pill (~50 × 30) that hosts three
+            // sequentially-pulsing dots — more elegant than the
+            // circular indeterminate spinner the user wanted gone.
+            return NSSize(width: 54 + bleed, height: height + bleed)
         case .error, .notice:
             return NSSize(width: 130 + bleed, height: height + bleed)
         }
