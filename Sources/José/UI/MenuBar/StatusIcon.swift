@@ -17,9 +17,9 @@ enum StatusIcon {
     static let size = CGSize(width: 22, height: 22)
 
     /// Renders the given state to an `NSImage` ready to assign to
-    /// `NSStatusItem.button.image`. Idle/processing are template images
-    /// (system tints them light/dark); recording uses the Siri gradient
-    /// (non-template); error keeps its red triangle overlay.
+    /// `NSStatusItem.button.image`. All states except .error are template
+    /// images (system tints them white/black per menu-bar mode); .error
+    /// keeps its non-template red triangle overlay.
     static func image(for state: StatusIconState) -> NSImage {
         let renderer = ImageRenderer(
             content: StatusIconView(state: state)
@@ -29,12 +29,8 @@ enum StatusIcon {
         let image = renderer.nsImage ?? NSImage(size: size)
         image.size = size
         switch state {
-        case .recording, .error:
-            // Both keep their colors as-rendered: recording shows the
-            // Siri gradient bars, error keeps its red badge.
-            image.isTemplate = false
-        case .idle, .processing:
-            image.isTemplate = true
+        case .error: image.isTemplate = false
+        default: image.isTemplate = true
         }
         return image
     }
@@ -47,26 +43,17 @@ private struct StatusIconView: View {
         Canvas { context, canvasSize in
             switch state {
             case .idle:
-                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45], colors: nil)
+                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45])
             case .recording(let level):
-                drawBars(context: context, size: canvasSize, levels: recordingLevels(for: level), colors: Self.siriBarColors)
+                drawBars(context: context, size: canvasSize, levels: recordingLevels(for: level))
             case .processing(let phase):
                 drawSpinner(context: context, size: canvasSize, phase: phase)
             case .error:
-                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45], colors: nil)
+                drawBars(context: context, size: canvasSize, levels: [0.45, 0.7, 0.45])
                 drawErrorOverlay(context: context, size: canvasSize)
             }
         }
     }
-
-    /// Three bars sampled from a vivid Siri-orb palette — hot pink → vivid
-    /// purple-blue → electric cyan. Saturated enough to read like the
-    /// actual iOS Siri animation rather than a pastel approximation.
-    private static let siriBarColors: [Color] = [
-        Color(red: 1.00, green: 0.28, blue: 0.58),  // hot pink/magenta (t=0)
-        Color(red: 0.55, green: 0.42, blue: 0.98),  // electric purple-blue (t=0.5)
-        Color(red: 0.20, green: 0.92, blue: 0.95)   // bright cyan (t=1)
-    ]
 
     private func recordingLevels(for level: Float) -> [Double] {
         let l = max(0.0, min(1.0, Double(level)))
@@ -77,11 +64,9 @@ private struct StatusIconView: View {
         return [outerA, middle, outerB]
     }
 
-    /// `colors` of nil means template-style fill (`.primary`) — system
-    /// tints to white/black per menu bar mode. Pass a 3-color array to
-    /// paint each bar individually (used for the Siri-gradient recording
-    /// state, which is rendered non-template).
-    private func drawBars(context: GraphicsContext, size: CGSize, levels: [Double], colors: [Color]?) {
+    /// All bars fill with `.primary`; the image is rendered as a template
+    /// so the system menu-bar tint (white/black per mode) takes over.
+    private func drawBars(context: GraphicsContext, size: CGSize, levels: [Double]) {
         let barCount = 3
         let barWidth: CGFloat = 3
         let spacing: CGFloat = 2
@@ -97,8 +82,7 @@ private struct StatusIconView: View {
             let y = centerY - h / 2
             let rect = CGRect(x: x, y: y, width: barWidth, height: h)
             let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-            let fill: Color = (colors?[i]) ?? .primary
-            context.fill(path, with: .color(fill))
+            context.fill(path, with: .color(.primary))
         }
     }
 
