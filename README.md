@@ -25,7 +25,7 @@
 
 ### 1. Download
 
-Grab `José-<version>.zip` from the [Releases page](https://github.com/REPLACE_ME/jose/releases) and unzip it. Drag `José.app` into `/Applications/`.
+Grab `José-<version>.zip` from the [Releases page](https://github.com/ericyangchen/jose/releases) and unzip it. Drag `José.app` into `/Applications/`.
 
 ### 2. Bypass Gatekeeper (one-time)
 
@@ -81,7 +81,7 @@ Click the menu-bar icon → **Settings…** to open the configuration window.
 ## Building from source (for contributors)
 
 ```bash
-git clone https://github.com/REPLACE_ME/jose.git
+git clone https://github.com/ericyangchen/jose.git
 cd jose
 ./Scripts/setup.sh        # installs xcodegen via brew, generates José.xcodeproj
 open José.xcodeproj       # ⌘R to run; Product → Archive to ship
