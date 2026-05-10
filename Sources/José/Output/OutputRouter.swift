@@ -21,6 +21,12 @@ final class OutputRouter {
         }
 
         if action == .pasteAndCopy {
+            if !PasteSimulator.isAuthorized {
+                // Re-issue the prompt so the user has a one-click path to
+                // System Settings → Privacy & Security → Accessibility,
+                // even if they dismissed the launch-time dialog.
+                PasteSimulator.requestAuthorizationPrompt()
+            }
             try? await Task.sleep(for: .milliseconds(30))
             PasteSimulator.send()
         }

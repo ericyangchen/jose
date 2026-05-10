@@ -8,6 +8,18 @@ enum PasteSimulator {
     private static let cmdKey: CGKeyCode = 0x37
     private static let vKey: CGKeyCode = 0x09
 
+    /// True iff the user granted Accessibility. Cached after first prompt to
+    /// avoid spamming `AXIsProcessTrusted` on every paste.
+    static var isAuthorized: Bool { AXIsProcessTrusted() }
+
+    /// Triggers the system Accessibility prompt (only does anything once
+    /// per process — once the user clicks "Open System Settings", the
+    /// prompt is suppressed). Safe to call repeatedly.
+    static func requestAuthorizationPrompt() {
+        let opts: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        _ = AXIsProcessTrustedWithOptions(opts as CFDictionary)
+    }
+
     /// Posts a synthetic ⌘V to `cghidEventTap`. Requires Accessibility.
     static func send() {
         guard AXIsProcessTrusted() else {

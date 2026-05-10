@@ -48,6 +48,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboardingWindow.showIfNeeded { [weak self] in
             self?.coordinator.onboardingFinished()
         }
+
+        // Trigger the Accessibility permission prompt at launch if it
+        // hasn't been granted. Without it, slot A's synthetic ⌘V silently
+        // no-ops — the user gets clipboard-only output and can't tell why.
+        // The system shows its native prompt the first time we call this
+        // per process; after the user grants in System Settings, restarts
+        // pick up the change.
+        if !PasteSimulator.isAuthorized {
+            PasteSimulator.requestAuthorizationPrompt()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
