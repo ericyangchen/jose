@@ -5,7 +5,7 @@ struct HotkeysPane: View {
     @Bindable var settings: Settings
 
     var body: some View {
-        PaneScaffold(title: "Hotkeys") {
+        PaneScaffold(title: "Hotkeys", subtitle: "Bind a key for transcribe-and-paste (slot A) or transcribe-and-copy (slot B).") {
             SettingsCard("Slot A — Transcribe & Paste") {
                 SlotEditor(
                     slot: .A,

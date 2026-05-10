@@ -3,7 +3,7 @@ import AppKit
 
 struct AboutPane: View {
     var body: some View {
-        PaneScaffold(title: "About") {
+        PaneScaffold(title: "About", subtitle: "Version, license, and project links.") {
             SettingsCard {
                 HStack(alignment: .top, spacing: 20) {
                     appIcon

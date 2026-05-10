@@ -6,7 +6,7 @@ struct GeneralPane: View {
     @Bindable var settings: Settings
 
     var body: some View {
-        PaneScaffold(title: "General") {
+        PaneScaffold(title: "General", subtitle: "Launch behavior, Dock, and menu-bar options.") {
             SettingsCard("Startup") {
                 SettingsRow(
                     "Launch José at login",

@@ -6,7 +6,7 @@ struct AudioPane: View {
     @State private var devices: [AudioDeviceOption] = []
 
     var body: some View {
-        PaneScaffold(title: "Audio") {
+        PaneScaffold(title: "Audio", subtitle: "Choose which microphone José listens on.") {
             SettingsCard("Input Device") {
                 SettingsRow(
                     "Microphone",

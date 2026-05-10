@@ -10,7 +10,7 @@ struct PermissionsPane: View {
     @State private var refreshTimer: Timer?
 
     var body: some View {
-        PaneScaffold(title: "Permissions") {
+        PaneScaffold(title: "Permissions", subtitle: "What José is allowed to do on this Mac.") {
             SettingsCard {
                 Text("José needs three system permissions to function. Toggle each in System Settings → Privacy & Security; status here updates automatically.")
                     .font(.system(size: 11))
@@ -92,21 +92,28 @@ struct PermissionsPane: View {
         }
     }
 
+    @State private var showsImAddInstructions = false
+
     private func handleRetry(for permission: SystemPermission) {
         switch permission {
         case .microphone:
             Task { _ = await permissions.requestMicrophone() }
         case .accessibility:
             permissions.requestAccessibilityPrompt()
-            // If the prompt is suppressed (already shown this session and
-            // user dismissed without granting), just open Settings.
             if permissions.accessibility != .granted {
                 permissions.openSystemSettings(for: .accessibility)
             }
         case .inputMonitoring:
+            // The OS-side IOHIDRequestAccess silently auto-denies for
+            // ad-hoc-signed builds, so the standard Request flow doesn't
+            // produce a list entry the user can toggle. Skip straight to
+            // the manual-add workaround: pop Finder + Settings and show
+            // a clear instruction sheet.
             permissions.requestInputMonitoring()
             if permissions.inputMonitoring != .granted {
                 permissions.openSystemSettings(for: .inputMonitoring)
+                permissions.revealAppInFinder()
+                showsImAddInstructions = true
             }
         }
     }
@@ -129,6 +136,18 @@ private struct PermissionRow: View {
                 HStack(spacing: 8) {
                     Text(permission.displayName)
                         .font(.system(size: 13, weight: .semibold))
+                    if permission.isOptional {
+                        Text("Optional")
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .tracking(0.4)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.secondary.opacity(0.15))
+                            )
+                            .foregroundStyle(.secondary)
+                    }
                     statusBadge
                 }
                 Text(permission.rationale)

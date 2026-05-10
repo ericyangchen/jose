@@ -36,7 +36,7 @@ struct TranscriptionPane: View {
     }
 
     var body: some View {
-        PaneScaffold(title: "Transcription") {
+        PaneScaffold(title: "Transcription", subtitle: "Model, OpenAI key, spoken languages, and the system prompt.") {
             modelCard
             languagesCard
             apiKeyCard

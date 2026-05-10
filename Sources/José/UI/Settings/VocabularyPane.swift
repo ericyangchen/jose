@@ -5,7 +5,7 @@ struct VocabularyPane: View {
     @State private var newTerm: String = ""
 
     var body: some View {
-        PaneScaffold(title: "Vocabulary") {
+        PaneScaffold(title: "Vocabulary", subtitle: "Technical terms José tells the model to expect.") {
             categoriesCard
             customCard
             statsCard
