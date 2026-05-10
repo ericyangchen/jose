@@ -15,11 +15,18 @@ enum HUDVariant: Equatable {
 @Observable
 final class HUDViewModel {
     var variant: HUDVariant = .processing
+    /// Newly-arrived RMS samples (one per ~140 ms after throttling).
+    /// `pushLevel` appends here; the smoothing tick interpolates the
+    /// displayedLevels view-state toward these targets.
     var levels: [Float] = []
+    /// What the WaveformView actually draws — interpolates each frame
+    /// toward `levels` so bar height transitions are smooth instead of
+    /// stepwise.
+    var displayedLevels: [Float] = []
     var elapsed: TimeInterval = 0
     var pulse: Bool = false
 
-    static let barCount = 30
+    static let barCount = 24
 
     func pushLevel(_ value: Float) {
         let clamped = max(0, min(1, value))
@@ -27,10 +34,31 @@ final class HUDViewModel {
         if levels.count > Self.barCount {
             levels.removeFirst(levels.count - Self.barCount)
         }
+        // Make sure displayedLevels has the same length so the smoothing
+        // tick has a target slot for every bar. New slots start near zero
+        // so the bar grows in from the baseline rather than popping in.
+        while displayedLevels.count < levels.count {
+            displayedLevels.append(0)
+        }
+        if displayedLevels.count > Self.barCount {
+            displayedLevels.removeFirst(displayedLevels.count - Self.barCount)
+        }
+    }
+
+    /// Called at ~60 Hz from HUDController during recording. Eases each
+    /// displayed value toward its target. Lerp factor 0.22 was tuned by
+    /// eye — bars track the voice but don't feel jittery.
+    func tickSmoothing() {
+        guard displayedLevels.count == levels.count else { return }
+        let lerp: Float = 0.22
+        for i in 0..<displayedLevels.count {
+            displayedLevels[i] += (levels[i] - displayedLevels[i]) * lerp
+        }
     }
 
     func resetLevels() {
         levels.removeAll(keepingCapacity: true)
+        displayedLevels.removeAll(keepingCapacity: true)
     }
 }
 
@@ -99,8 +127,8 @@ struct HUDView: View {
                 .opacity(model.pulse ? 1.0 : 0.6)
                 .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: model.pulse)
 
-            WaveformView(levels: model.levels, barCount: HUDViewModel.barCount)
-                .frame(height: 18)
+            WaveformView(levels: model.displayedLevels, barCount: HUDViewModel.barCount)
+                .frame(height: 24)
 
             Text(formatTimer(model.elapsed))
                 .font(.system(size: 11, weight: .medium, design: .rounded))

@@ -16,6 +16,7 @@ final class HUDController {
     private var hostingView: NSHostingView<HUDView>?
     private var levelTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
+    private var smoothingTask: Task<Void, Never>?
     private var hideTask: Task<Void, Never>?
     private var recordingStart: Date?
 
@@ -24,7 +25,7 @@ final class HUDController {
     /// gradient glow has a tiny halo of empty pixels to fade into.
     /// Smaller bleed keeps the soft bloom from reaching the rectangular
     /// window edge (which would clip it and make the corners look square).
-    private let height: CGFloat = 36
+    private let height: CGFloat = 42
     private static let haloBleed: CGFloat = 3
 
     init() {}
@@ -108,6 +109,7 @@ final class HUDController {
             model.pulse = true
             model.variant = .recording
             startTimer()
+            startSmoothingTick()
             consumeLevels(stream)
 
         case .processing:
@@ -132,15 +134,34 @@ final class HUDController {
         levelTask = nil
         timerTask?.cancel()
         timerTask = nil
+        smoothingTask?.cancel()
+        smoothingTask = nil
+    }
+
+    /// Drives WaveformView's smooth bar interpolation at ~60 Hz. The
+    /// model's `levels` array holds *target* heights (updated at ~7 Hz
+    /// by consumeLevels); `displayedLevels` is what the view reads, and
+    /// each tick eases it toward `levels`. This is what makes voice peaks
+    /// glide rather than snap.
+    private func startSmoothingTick() {
+        smoothingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(16))  // ~60 Hz
+                guard !Task.isCancelled else { break }
+                await MainActor.run { self?.model.tickSmoothing() }
+            }
+        }
     }
 
     private func consumeLevels(_ stream: AsyncStream<Float>) {
         // Audio levels arrive at ~33 Hz (one per 30 ms chunk). At that rate
-        // the 30-bar buffer fills in under a second, so the waveform looks
+        // the 24-bar buffer fills in under a second, so the waveform looks
         // like a finished animation the moment recording starts. Throttle
-        // to ~7 Hz instead — peak energy across each ~140 ms window — so
-        // the bars accumulate visibly from right to left over ~4 s.
-        let groupSize = 5
+        // to ~8 Hz — peak energy across each ~120 ms window — so the bars
+        // accumulate visibly from right to left over ~3 s. The smoothing
+        // tick (60 Hz, see startSmoothingTick) eases between samples so
+        // the bars glide instead of stepping.
+        let groupSize = 4
         levelTask = Task { [weak self] in
             var bucket: [Float] = []
             bucket.reserveCapacity(groupSize)
