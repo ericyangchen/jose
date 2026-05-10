@@ -57,11 +57,17 @@ struct WaveformView: View {
 
     // MARK: - Per-bar color (precomputed Siri-gradient sample by position)
 
+    /// Deeper, more saturated Siri palette for the waveform bars.
+    /// The HUD halo's pastel stops (~78 % lightness) read fine as a glow,
+    /// but on the translucent popover-material pill those same pastels
+    /// got washed out — the bars were hard to see. These stops sit at
+    /// roughly 55–65 % lightness so they punch against both light and
+    /// dark mode pill backgrounds while still looking Siri-chromatic.
     private static let siriStops: [(red: Double, green: Double, blue: Double)] = [
-        (0.949, 0.659, 0.769),
-        (0.710, 0.659, 0.910),
-        (0.561, 0.737, 0.910),
-        (0.584, 0.863, 0.875),
+        (0.92, 0.40, 0.62),  // deep rose
+        (0.55, 0.40, 0.94),  // vivid purple
+        (0.28, 0.58, 0.96),  // deeper blue
+        (0.30, 0.78, 0.84),  // deeper cyan
     ]
 
     private func color(at index: Int) -> Color {

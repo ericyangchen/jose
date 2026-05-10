@@ -59,14 +59,14 @@ private struct StatusIconView: View {
         }
     }
 
-    /// Three bars sampled from the four-stop Siri gradient (pink → purple
-    /// → blue → cyan) at t = 0, 0.5, 1.0. Used for the recording state so
-    /// the menu-bar icon picks up the same chromatic identity as the HUD
-    /// halo.
+    /// Three bars sampled from the deeper-saturation Siri palette (the
+    /// same one the HUD waveform uses, not the soft halo pastels). The
+    /// menu bar's translucent dark/light mode would wash out lighter
+    /// stops; these read clearly against both.
     private static let siriBarColors: [Color] = [
-        Color(red: 0.949, green: 0.659, blue: 0.769),  // pink (t=0)
-        Color(red: 0.635, green: 0.698, blue: 0.910),  // purple→blue interp (t=0.5)
-        Color(red: 0.584, green: 0.863, blue: 0.875)   // cyan (t=1)
+        Color(red: 0.92, green: 0.40, blue: 0.62),  // deep rose (t=0)
+        Color(red: 0.42, green: 0.49, blue: 0.95),  // purple→blue interp (t=0.5)
+        Color(red: 0.30, green: 0.78, blue: 0.84)   // deeper cyan (t=1)
     ]
 
     private func recordingLevels(for level: Float) -> [Double] {

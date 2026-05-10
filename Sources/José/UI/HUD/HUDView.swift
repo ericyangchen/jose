@@ -59,7 +59,7 @@ struct HUDView: View {
             ZStack {
                 VisualEffectBackground()
                     .clipShape(Capsule())
-                    .opacity(0.78)
+                    .opacity(0.86)
 
                 // Padding is per-variant — the recording pill needs side
                 // padding for its [dot, waveform, timer] HStack, but the
