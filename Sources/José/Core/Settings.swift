@@ -53,6 +53,11 @@ enum VocabularyCategory: String, Codable, CaseIterable, Sendable {
 final class Settings {
     static let shared = Settings()
 
+    /// Bump when DefaultPrompt.md changes meaningfully. Existing installs
+    /// with a stored prompt below this version are auto-refreshed from
+    /// the bundle on next launch (unless the user has already edited it).
+    static let currentBundledPromptVersion: Int = 2
+
     // MARK: General
     var launchAtLogin: Bool {
         didSet { Defaults.set(launchAtLogin, for: .launchAtLogin) }
@@ -144,8 +149,23 @@ final class Settings {
         self.transcriptionModel = Defaults.string(for: .transcriptionModel)
             .flatMap(TranscriptionModel.init(rawValue:)) ?? .gpt4oTranscribe
         self.streamingEnabled = Defaults.bool(for: .streamingEnabled) ?? false
-        self.systemPrompt = Defaults.string(for: .systemPrompt)
-            ?? Settings.bundledDefaultPrompt()
+
+        // The bundled prompt is the source of truth until the user edits it.
+        // We tag releases with a monotonically increasing version; an existing
+        // install with a stored prompt < currentBundledVersion gets a one-shot
+        // refresh from the bundle so prompt fixes propagate to users without
+        // forcing them to "Reset to default" by hand.
+        let storedPromptVersion = Defaults.int(for: .bundledPromptVersion) ?? 0
+        let resolvedPrompt: String
+        if let stored = Defaults.string(for: .systemPrompt),
+           storedPromptVersion >= Self.currentBundledPromptVersion {
+            resolvedPrompt = stored
+        } else {
+            resolvedPrompt = Self.bundledDefaultPrompt()
+            Defaults.set(resolvedPrompt, for: .systemPrompt)
+            Defaults.set(Self.currentBundledPromptVersion, for: .bundledPromptVersion)
+        }
+        self.systemPrompt = resolvedPrompt
 
         let storedCats = (Defaults.stringArray(for: .vocabularyEnabledCategories) ?? [])
             .compactMap(VocabularyCategory.init(rawValue:))

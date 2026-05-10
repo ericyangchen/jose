@@ -28,6 +28,8 @@ enum DefaultsKey: String {
     case usageSecondsByModel = "usage.secondsByModel"
 
     case onboardingCompleted = "onboarding.completed"
+
+    case bundledPromptVersion = "transcription.bundledPromptVersion"
 }
 
 enum Defaults {
