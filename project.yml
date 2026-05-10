@@ -14,7 +14,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     PRODUCT_BUNDLE_IDENTIFIER: com.ericyangchen.jose
     CURRENT_PROJECT_VERSION: 1
-    MARKETING_VERSION: "0.1.1"
+    MARKETING_VERSION: "0.1.2"
     DEAD_CODE_STRIPPING: YES
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Manual
@@ -45,7 +45,6 @@ targets:
       - path: Resources/DefaultVocabulary.yaml
         type: file
       - path: Resources/Assets.xcassets
-        type: folder
     resources: []
     info:
       path: Resources/Info.plist
@@ -60,6 +59,8 @@ targets:
         LSUIElement: true
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
+        CFBundleIconName: AppIcon
+        CFBundleIconFile: AppIcon
         NSMicrophoneUsageDescription: "José needs microphone access to capture your voice for transcription."
         NSAppleEventsUsageDescription: "José uses Apple Events to paste transcriptions into the focused application."
         NSSupportsAutomaticTermination: false

@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let isFirstLaunch = (Defaults.bool(for: .onboardingCompleted) ?? false) == false
         onboardingWindow.showIfNeeded { [weak self] in
             self?.coordinator.onboardingFinished()
-            self?.requestAllPermissionsAtLaunch()
+            self?.requestAllPermissionsAtLaunch(isFirstLaunch: isFirstLaunch)
 
             // First-time users land in Settings right after the BYOK flow
             // so they can rebind the hotkey, pick a model, etc. before
@@ -74,12 +74,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Request mic + Accessibility + Input Monitoring upfront so the user
-    /// hits all the system dialogs in one batch on first launch instead of
-    /// being interrupted mid-recording. Each request is idempotent: the
-    /// system shows its dialog only when the permission is `.notDetermined`,
-    /// and the OS-side check is non-blocking.
-    private func requestAllPermissionsAtLaunch() {
+    /// Request mic + Accessibility upfront so the user hits all the system
+    /// dialogs in one batch on first launch instead of being interrupted
+    /// mid-recording. Each request is idempotent: the system only shows its
+    /// dialog when the permission is `.notDetermined`.
+    ///
+    /// `isFirstLaunch` is the trigger for the System Settings auto-open
+    /// when AX isn't granted — `AXIsProcessTrustedWithOptions(prompt: true)`
+    /// shows a dialog but doesn't always *register* the app in the AX
+    /// list (especially for ad-hoc-signed bundles). Opening the AX page
+    /// directly lets the user toggle the entry on (or click `+` to add
+    /// the bundle manually if it doesn't show up).
+    private func requestAllPermissionsAtLaunch(isFirstLaunch: Bool) {
         let permissions = PermissionsCoordinator.shared
 
         Task { @MainActor in
@@ -94,6 +100,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 3. Input Monitoring — only fires its dialog when status is
             // .unknown / .notDetermined; harmless to call when already granted.
             permissions.requestInputMonitoring()
+
+            // Give the AX prompt a beat to register the app in TCC. Then
+            // on first launch only, if the user still hasn't granted, open
+            // System Settings → Privacy → Accessibility so the entry is
+            // immediately findable. Returning users skip this — they don't
+            // want Settings popping every launch.
+            if isFirstLaunch {
+                try? await Task.sleep(for: .seconds(1))
+                if permissions.accessibility != .granted {
+                    permissions.openSystemSettings(for: .accessibility)
+                }
+            }
         }
     }
 
