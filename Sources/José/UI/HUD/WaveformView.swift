@@ -2,6 +2,11 @@ import SwiftUI
 
 /// 30 vertical bars whose heights are driven by recent RMS values. Each bar
 /// is painted with a horizontal sample of the Siri gradient (spec §4.2 / §4.6).
+///
+/// Wrapped in a TimelineView so SwiftUI guarantees a redraw on every frame
+/// even if the @Observable invalidation arrives a tick late — without it
+/// the bars freeze on shorter HUD pills where height changes between
+/// adjacent samples don't pass SwiftUI's diffing threshold.
 struct WaveformView: View {
     let levels: [Float]
     let barCount: Int
@@ -14,31 +19,45 @@ struct WaveformView: View {
     ]
 
     var body: some View {
-        Canvas { context, size in
-            guard barCount > 0 else { return }
-            let spacing: CGFloat = 3
-            let totalSpacing = spacing * CGFloat(barCount - 1)
-            let barWidth = max(1.5, (size.width - totalSpacing) / CGFloat(barCount))
-            let midY = size.height / 2
-
-            for index in 0..<barCount {
-                let level = level(at: index)
-                let height = max(2, min(size.height, CGFloat(level) * 40))
-                let x = CGFloat(index) * (barWidth + spacing)
-                let rect = CGRect(x: x, y: midY - height / 2, width: barWidth, height: height)
-                let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-                let t = barCount == 1 ? 0 : Double(index) / Double(barCount - 1)
-                context.fill(path, with: .color(sampleSiri(at: t)))
+        TimelineView(.animation) { _ in
+            Canvas { context, size in
+                drawBars(context: context, size: size)
             }
         }
     }
 
+    private func drawBars(context: GraphicsContext, size: CGSize) {
+        guard barCount > 0 else { return }
+        let spacing: CGFloat = 2
+        let totalSpacing = spacing * CGFloat(barCount - 1)
+        let barWidth = max(1.5, (size.width - totalSpacing) / CGFloat(barCount))
+        let midY = size.height / 2
+
+        // Floor every bar at ~12% of the pill height so silence still
+        // shows a faint baseline (otherwise the waveform reads as "off"
+        // between syllables).
+        let minHeight = max(2, size.height * 0.12)
+
+        for index in 0..<barCount {
+            let level = level(at: index)
+            // Scale relative to pill height. log-style normalize is already
+            // baked into AudioLevelMonitor, so a linear map is right here.
+            let scaled = max(minHeight, CGFloat(level) * size.height)
+            let height = min(size.height, scaled)
+            let x = CGFloat(index) * (barWidth + spacing)
+            let rect = CGRect(x: x, y: midY - height / 2, width: barWidth, height: height)
+            let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
+            let t = barCount == 1 ? 0 : Double(index) / Double(barCount - 1)
+            context.fill(path, with: .color(sampleSiri(at: t)))
+        }
+    }
+
     private func level(at index: Int) -> Float {
-        guard !levels.isEmpty else { return 0.05 }
-        // Right-align: newest sample at the rightmost bar.
+        guard !levels.isEmpty else { return 0.06 }
+        // Right-align: newest sample at the rightmost bar, older samples slide left.
         let offset = barCount - levels.count
         let mapped = index - offset
-        guard mapped >= 0, mapped < levels.count else { return 0.05 }
+        guard mapped >= 0, mapped < levels.count else { return 0.06 }
         return levels[mapped]
     }
 
