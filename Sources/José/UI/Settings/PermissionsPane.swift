@@ -35,16 +35,44 @@ struct PermissionsPane: View {
                 }
             }
 
-            SettingsCard("Notes") {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("• Status reads live from the OS — no need to restart José after granting.")
-                    Text("• If José is an unsigned debug build, every Xcode rebuild creates a new ad-hoc signature. Accessibility trust is bound to the binary's signature, so you may need to toggle the Accessibility checkbox OFF and back ON after a rebuild.")
+            SettingsCard("Trouble granting Input Monitoring?") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Unsigned debug builds get auto-denied for Input Monitoring without showing a dialog (each rebuild gets a new ad-hoc signature, which macOS treats as untrusted). The two workarounds:")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("• Input Monitoring requires an app restart after granting before global hotkeys start working.")
+
+                    HStack(alignment: .center, spacing: 8) {
+                        Text("1.")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Drag José.app into the list manually:")
+                            .font(.system(size: 11))
+                        Spacer()
+                        Button("Show José.app in Finder") {
+                            permissions.revealAppInFinder()
+                        }
+                        .controlSize(.small)
+                    }
+
+                    HStack(alignment: .center, spacing: 8) {
+                        Text("2.")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Reset cached TCC trust and relaunch:")
+                            .font(.system(size: 11))
+                        Spacer()
+                        Button("Reset Trust") {
+                            permissions.resetTCCTrust()
+                        }
+                        .controlSize(.small)
+                    }
+
+                    Text("After granting Input Monitoring, fully quit and relaunch José — the OS only honors the new permission for monitors installed *after* the grant.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             }
         }
         .onAppear {

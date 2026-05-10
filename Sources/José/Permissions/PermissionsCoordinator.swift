@@ -168,4 +168,43 @@ final class PermissionsCoordinator {
         guard let url = permission.systemSettingsURL else { return }
         NSWorkspace.shared.open(url)
     }
+
+    /// Pops a Finder window with José.app pre-selected so the user can
+    /// drag it into the System Settings → Privacy → Input Monitoring (or
+    /// Accessibility) list using the `+` button. This is the workaround
+    /// for unsigned debug builds: macOS auto-denies IOHIDRequestAccess
+    /// without showing a dialog, so the app never appears in the list
+    /// automatically — manually adding it via the + button is the only
+    /// path to grant.
+    func revealAppInFinder() {
+        let bundleURL = Bundle.main.bundleURL
+        NSWorkspace.shared.activateFileViewerSelecting([bundleURL])
+    }
+
+    /// Wipes all TCC trust entries for José (Microphone + Accessibility +
+    /// Input Monitoring). Useful for unsigned debug builds where each
+    /// rebuild's new ad-hoc signature gets a stale "denied" cached entry
+    /// the user can't see or undo through System Settings. Runs `tccutil`
+    /// as the current user — no sudo needed.
+    @discardableResult
+    func resetTCCTrust() -> Bool {
+        let services = ["ListenEvent", "Accessibility", "Microphone"]
+        var allOK = true
+        for service in services {
+            let proc = Process()
+            proc.launchPath = "/usr/bin/tccutil"
+            proc.arguments = ["reset", service, KeychainStore.service]
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+                if proc.terminationStatus != 0 { allOK = false }
+            } catch {
+                Logger.permissions.error("tccutil reset \(service) failed: \(error.localizedDescription)")
+                allOK = false
+            }
+        }
+        refresh()
+        Logger.permissions.info("TCC reset \(allOK ? "succeeded" : "had failures") — restart the app to re-prompt")
+        return allOK
+    }
 }
