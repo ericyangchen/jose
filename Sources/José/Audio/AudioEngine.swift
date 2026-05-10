@@ -1,34 +1,280 @@
 import Foundation
+@preconcurrency import AVFoundation
 
-/// Public façade over the AVAudioEngine pipeline. Worker B2 (feat/audio)
-/// owns the implementation; this stub keeps the codebase compilable until
-/// the worker branch lands.
+enum AudioEngineError: LocalizedError {
+    case microphoneUnavailable
+    case formatUnsupported
+    case recorderInitFailed(Error)
+    case engineStartFailed(Error)
+    case alreadyRunning
+
+    var errorDescription: String? {
+        switch self {
+        case .microphoneUnavailable:
+            return NSLocalizedString(
+                "Microphone is unavailable. Check System Settings → Privacy & Security → Microphone.",
+                comment: "")
+        case .formatUnsupported:
+            return NSLocalizedString(
+                "The selected input device's audio format isn't supported.",
+                comment: "")
+        case .recorderInitFailed(let err):
+            return String(format: NSLocalizedString(
+                "Couldn't open the recording file: %@", comment: ""),
+                          err.localizedDescription)
+        case .engineStartFailed(let err):
+            return String(format: NSLocalizedString(
+                "Audio engine failed to start: %@", comment: ""),
+                          err.localizedDescription)
+        case .alreadyRunning:
+            return NSLocalizedString("Audio engine is already running.", comment: "")
+        }
+    }
+}
+
+/// Façade over the AVAudioEngine pipeline (spec §6.2).
+///
+/// Pipeline:
+///   inputNode (system rate)
+///     → AVAudioConverter (16 kHz mono Float32)
+///         ├── AVAudioFile (AAC m4a temp)
+///         ├── SileroVAD (30 ms / 480-sample chunks)
+///         └── AudioLevelMonitor (RMS → audioLevelStream)
+///
+/// Threading: the public surface is `@MainActor`. AVAudioEngine's tap
+/// callback runs on a render thread, so all per-buffer work is funneled
+/// through a private serial `DispatchQueue` and the underlying mutable
+/// state is `nonisolated(unsafe)`. This keeps the per-buffer hot path off
+/// the main actor while preserving a serial happens-before relationship
+/// across start/stop/cancel.
 @MainActor
 final class AudioEngine {
-    private(set) var audioLevelStream: AsyncStream<Float> = .init { _ in }
-    private(set) var hadSpeech: Bool = false
+    // MARK: - Public surface
+
+    private(set) var audioLevelStream: AsyncStream<Float>
+    var hadSpeech: Bool {
+        audioQueue.sync {
+            guard let vad = state.vad else { return false }
+            return vad.speechRatio >= 0.05
+        }
+    }
+
+    // MARK: - Private state (touched only on `audioQueue`)
+
+    private nonisolated(unsafe) var state = State()
+    private nonisolated let audioQueue = DispatchQueue(label: "com.eric.jose.audio", qos: .userInteractive)
+    private nonisolated(unsafe) var levelContinuation: AsyncStream<Float>.Continuation
+
+    private struct State {
+        var engine: AVAudioEngine?
+        var converter: AVAudioConverter?
+        var converterInputFormat: AVAudioFormat?
+        var converterOutputFormat: AVAudioFormat?
+        var recorder: AudioRecorder?
+        var vad: SileroVAD?
+        var levels: AudioLevelMonitor?
+        var isRunning = false
+    }
+
+    // MARK: - Init
 
     init() {
-        // Worker B2 wires up: AVAudioEngine.inputNode → AVAudioConverter
-        // (16k mono Float32) → fan-out to AVAudioFile (m4a temp), Silero VAD,
-        // and AudioLevelMonitor (RMS).
+        var continuation: AsyncStream<Float>.Continuation!
+        self.audioLevelStream = AsyncStream(bufferingPolicy: .bufferingNewest(8)) { c in
+            continuation = c
+        }
+        self.levelContinuation = continuation
     }
 
-    /// Begin capturing to a temp .m4a. Throws if the mic is unavailable
-    /// or permission is denied.
+    // MARK: - Public API
+
     func start() async throws {
-        Logger.audio.warning("AudioEngine.start() is a stub — feat/audio not merged yet")
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            audioQueue.async { [self] in
+                do {
+                    try self.startOnQueue()
+                    cont.resume()
+                } catch {
+                    self.tearDownOnQueue(deleteFile: true)
+                    cont.resume(throwing: error)
+                }
+            }
+        }
     }
 
-    /// Stop capturing and return the temp .m4a URL.
     func stop() async -> URL {
-        Logger.audio.warning("AudioEngine.stop() is a stub — feat/audio not merged yet")
-        return FileManager.default.temporaryDirectory
-            .appendingPathComponent("jose-stub-\(UUID().uuidString).m4a")
+        await withCheckedContinuation { (cont: CheckedContinuation<URL, Never>) in
+            audioQueue.async { [self] in
+                let url = self.stopOnQueue()
+                cont.resume(returning: url)
+            }
+        }
     }
 
-    /// Cancel without producing a usable file.
     func cancel() async {
-        Logger.audio.warning("AudioEngine.cancel() is a stub — feat/audio not merged yet")
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            audioQueue.async { [self] in
+                self.tearDownOnQueue(deleteFile: true)
+                cont.resume()
+            }
+        }
+    }
+
+    // MARK: - Queue-bound implementation
+
+    private nonisolated func startOnQueue() throws {
+        dispatchPrecondition(condition: .onQueue(audioQueue))
+        guard !state.isRunning else { throw AudioEngineError.alreadyRunning }
+
+        let engine = AVAudioEngine()
+        let input = engine.inputNode
+        let inputFormat = input.inputFormat(forBus: 0)
+
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+            throw AudioEngineError.microphoneUnavailable
+        }
+
+        guard let outputFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 16_000,
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw AudioEngineError.formatUnsupported
+        }
+
+        guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+            throw AudioEngineError.formatUnsupported
+        }
+
+        let recorder: AudioRecorder
+        do {
+            recorder = try AudioRecorder(pcmFormat: outputFormat)
+        } catch {
+            throw AudioEngineError.recorderInitFailed(error)
+        }
+
+        let vad = SileroVAD()
+        let levels = AudioLevelMonitor { [weak self] level in
+            self?.levelContinuation.yield(level)
+        }
+
+        // Tap on the input node in its native format; conversion happens
+        // inside the tap callback so we can keep one render-thread hop.
+        let tapBufferSize: AVAudioFrameCount = 1024
+        input.installTap(onBus: 0, bufferSize: tapBufferSize, format: inputFormat) {
+            [weak self] buffer, _ in
+            guard let self else { return }
+            self.audioQueue.async {
+                self.handleInputBuffer(buffer)
+            }
+        }
+
+        engine.prepare()
+        do {
+            try engine.start()
+        } catch {
+            input.removeTap(onBus: 0)
+            recorder.discard()
+            throw AudioEngineError.engineStartFailed(error)
+        }
+
+        state.engine = engine
+        state.converter = converter
+        state.converterInputFormat = inputFormat
+        state.converterOutputFormat = outputFormat
+        state.recorder = recorder
+        state.vad = vad
+        state.levels = levels
+        state.isRunning = true
+
+        Logger.audio.info("audio engine started — input \(Int(inputFormat.sampleRate)) Hz \(inputFormat.channelCount) ch → 16 kHz mono")
+    }
+
+    private nonisolated func stopOnQueue() -> URL {
+        dispatchPrecondition(condition: .onQueue(audioQueue))
+        guard let recorder = state.recorder else {
+            // Engine already torn down or never started — return a
+            // placeholder URL so the caller doesn't crash. Coordinator
+            // paths that hit this should already have errored out.
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("jose-empty-\(UUID().uuidString).m4a")
+        }
+        state.levels?.flush()
+        let url = recorder.url
+        let speechRatio = state.vad?.speechRatio ?? 0
+        Logger.audio.info("audio engine stopping — speech ratio \(String(format: "%.2f", speechRatio * 100))%")
+        tearDownOnQueue(deleteFile: false)
+        return url
+    }
+
+    private nonisolated func tearDownOnQueue(deleteFile: Bool) {
+        dispatchPrecondition(condition: .onQueue(audioQueue))
+        if let engine = state.engine {
+            engine.inputNode.removeTap(onBus: 0)
+            if engine.isRunning { engine.stop() }
+        }
+        if deleteFile {
+            state.recorder?.discard()
+        } else {
+            state.recorder?.close()
+        }
+        state.engine = nil
+        state.converter = nil
+        state.converterInputFormat = nil
+        state.converterOutputFormat = nil
+        state.recorder = nil
+        // Keep `vad` alive briefly so `hadSpeech` stays meaningful between
+        // stop() and the coordinator reading it. It's reset on next start.
+        state.levels = nil
+        state.isRunning = false
+    }
+
+    // MARK: - Hot path (audioQueue)
+
+    private nonisolated func handleInputBuffer(_ buffer: AVAudioPCMBuffer) {
+        dispatchPrecondition(condition: .onQueue(audioQueue))
+        guard state.isRunning,
+              let converter = state.converter,
+              let outFormat = state.converterOutputFormat,
+              let recorder = state.recorder,
+              let vad = state.vad,
+              let levels = state.levels else { return }
+
+        // Output capacity scales with the sample-rate ratio (rounded up).
+        let inSR = buffer.format.sampleRate
+        let outSR = outFormat.sampleRate
+        let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * outSR / inSR)) + 32
+
+        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: capacity) else {
+            return
+        }
+
+        var supplied = false
+        var error: NSError?
+        let status = converter.convert(to: outBuffer, error: &error) { _, inputStatus in
+            if supplied {
+                inputStatus.pointee = .noDataNow
+                return nil
+            }
+            supplied = true
+            inputStatus.pointee = .haveData
+            return buffer
+        }
+
+        if let error {
+            Logger.audio.error("audio converter error: \(error.localizedDescription)")
+            return
+        }
+        guard status != .error, outBuffer.frameLength > 0 else { return }
+
+        // Fan-out: file, VAD, level monitor.
+        recorder.append(outBuffer)
+
+        if let channelData = outBuffer.floatChannelData?.pointee {
+            let buf = UnsafeBufferPointer(start: channelData, count: Int(outBuffer.frameLength))
+            vad.process(buf)
+            levels.process(buf)
+        }
     }
 }
