@@ -1,0 +1,105 @@
+# Default vocabulary list bundled with José.
+# Each top-level key is a category (toggleable in Settings → Vocabulary).
+# Workers parse this file at app launch via PromptBuilder.
+
+languages_frameworks:
+  - TypeScript
+  - JavaScript
+  - Python
+  - Rust
+  - Go
+  - Swift
+  - Kotlin
+  - Java
+  - Ruby
+  - React
+  - Vue
+  - Svelte
+  - Next.js
+  - Nuxt
+  - SwiftUI
+  - AppKit
+  - NestJS
+  - Express
+  - FastAPI
+  - Django
+  - Flask
+  - Rails
+  - Spring
+  - Tailwind
+  - shadcn
+
+infrastructure:
+  - Kubernetes
+  - Docker
+  - Terraform
+  - Helm
+  - nginx
+  - Caddy
+  - AWS
+  - GCP
+  - Azure
+  - Cloudflare
+  - Vercel
+  - Fly.io
+  - CI/CD
+  - GitHub Actions
+  - GitLab CI
+
+databases:
+  - Postgres
+  - MySQL
+  - SQLite
+  - MongoDB
+  - Redis
+  - Elasticsearch
+  - DynamoDB
+  - Cassandra
+  - ClickHouse
+  - TypeORM
+  - Prisma
+  - Drizzle
+  - SQLAlchemy
+
+protocols_apis:
+  - REST
+  - GraphQL
+  - gRPC
+  - WebSocket
+  - Webhook
+  - OAuth
+  - JWT
+  - SAML
+
+ai_ml:
+  - LLM
+  - GPT
+  - Claude
+  - transformer
+  - embedding
+  - RAG
+  - vector database
+  - fine-tuning
+  - inference
+  - PyTorch
+  - TensorFlow
+  - JAX
+  - Hugging Face
+
+general_dev:
+  - microservices
+  - monorepo
+  - serverless
+  - edge function
+  - CRUD
+  - RBAC
+  - MFA
+  - SSO
+  - idempotent
+  - eventual consistency
+  - PR
+  - MR
+  - diff
+  - rebase
+  - squash
+  - cherry-pick
