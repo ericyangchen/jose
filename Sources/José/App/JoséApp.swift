@@ -5,11 +5,10 @@ struct JoséApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        // José is a menu-bar-only app (LSUIElement). All UI is owned by
-        // AppDelegate via NSStatusItem, NSPanel (HUD), and NSWindow (Settings).
-        // The Scene below exists only to satisfy SwiftUI's @main requirement;
-        // we never present its window.
-        Settings {
+        // SwiftUI.Settings (qualified — we have our own Settings type).
+        // José is a menu-bar-only app (LSUIElement); the AppDelegate owns
+        // every visible window. This scene is never presented.
+        SwiftUI.Settings {
             EmptyView()
         }
     }

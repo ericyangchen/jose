@@ -183,7 +183,7 @@ final class AppCoordinator: HotkeyManagerDelegate {
         let hadSpeech = audioEngine.hadSpeech
 
         if !hadSpeech {
-            Logger.coordinator.info("VAD ratio under \(self.allSilenceSpeechRatioGate * 100, privacy: .public)% — likely silence, discarding")
+            Logger.coordinator.info("VAD ratio under \(Int(self.allSilenceSpeechRatioGate * 100))% — likely silence, discarding")
             try? FileManager.default.removeItem(at: audioURL)
             hud?.show(.notice(message: "No speech detected"))
             stateModel.transition(to: .idle)

@@ -36,6 +36,10 @@ targets:
         excludes:
           - "Audio/VAD/convert_silero.py"
           - "Audio/VAD/README.md"
+          - "Audio/VAD/.venv/**"
+          - "Audio/VAD/.work/**"
+          - "**/*.pyc"
+          - "**/__pycache__/**"
       - path: Resources/DefaultPrompt.md
         type: file
       - path: Resources/DefaultVocabulary.yaml
