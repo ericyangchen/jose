@@ -23,6 +23,7 @@ final class ModifierHotkey {
     private var localMonitor: Any?
 
     private var lastFlags: UInt = 0
+    private var hasSeenFirstEvent: Bool = false
     private var isDown: Bool = false
     private var armingTask: Task<Void, Never>?
 
@@ -48,7 +49,14 @@ final class ModifierHotkey {
             return
         }
 
-        lastFlags = UInt(NSEvent.modifierFlags.rawValue)
+        // Don't seed lastFlags from NSEvent.modifierFlags — that returns
+        // the *collapsed* public bits which don't carry left/right
+        // device-specific masks. If the user happens to be holding the
+        // hotkey at start time, the first real flagsChanged event would
+        // produce a spurious .down (prev=0, curr=mask). Wait for the
+        // first event to seed instead.
+        hasSeenFirstEvent = false
+        lastFlags = 0
 
         // Two monitors: global fires while another app is focused, local fires
         // when José itself has focus (global skips own-app events).
@@ -82,6 +90,15 @@ final class ModifierHotkey {
         let flags = UInt(event.modifierFlags.rawValue)
         let prev = lastFlags
         lastFlags = flags
+
+        // First flagsChanged after start() — seed lastFlags but don't
+        // emit. Otherwise a user already holding the hotkey when José
+        // launches (or restarts the hotkey manager) gets a phantom
+        // .down with no matching .up.
+        guard hasSeenFirstEvent else {
+            hasSeenFirstEvent = true
+            return
+        }
 
         let bitWasSet = (prev & mask) == mask
         let bitIsSet = (flags & mask) == mask
