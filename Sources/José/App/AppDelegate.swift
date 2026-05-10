@@ -41,6 +41,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         coordinator.bindUI(hud: hudController, statusItem: statusItemController)
 
+        // Pre-mount the HUD's NSPanel + NSHostingView at launch so the
+        // very first hotkey press doesn't pay the SwiftUI-tree mount
+        // cost on the hot path.
+        hudController.warmUp()
+
         // Request Input Monitoring *before* the hotkey manager installs
         // any global event listeners — that's the OS's signal to register
         // José in the System Settings → Privacy → Input Monitoring list.

@@ -29,6 +29,13 @@ final class HUDController {
 
     init() {}
 
+    /// Eagerly create the HUD panel + its NSHostingView so the *first*
+    /// recording doesn't pay the SwiftUI-tree-mounting cost on the hot
+    /// path. Called from AppDelegate at launch.
+    func warmUp() {
+        _ = ensureWindow()
+    }
+
     func show(_ presentation: HUDPresentation) {
         Logger.hud.debug("show: \(String(describing: presentation))")
         let wasFading = hideTask != nil
