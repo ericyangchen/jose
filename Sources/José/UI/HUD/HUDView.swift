@@ -59,6 +59,7 @@ struct HUDView: View {
             ZStack {
                 VisualEffectBackground()
                     .clipShape(Capsule())
+                    .opacity(0.78)
 
                 // Padding is per-variant — the recording pill needs side
                 // padding for its [dot, waveform, timer] HStack, but the
@@ -146,15 +147,23 @@ struct HUDView: View {
     }
 }
 
-/// Bridges `NSVisualEffectView` (`.hudWindow`, `.behindWindow`, `.active`) into
-/// SwiftUI. Provides the pill's frosted background.
+/// Bridges `NSVisualEffectView` into SwiftUI for the pill's frosted glass.
+///
+/// Material choice — `.popover` instead of `.hudWindow`: the HUD material
+/// is heavy and opaque to keep its content readable through anything; for
+/// our small pill we want the desktop to show through more, so the popover
+/// material (lighter, more transparent in both light and dark mode) is a
+/// better fit. `isEmphasized = false` skips the saturation boost AppKit
+/// applies to "active" UI; `behindWindow` still pulls the desktop blur in
+/// from behind the panel. Combined with the .opacity(0.78) modifier on the
+/// caller side, the pill reads as a soft translucent capsule.
 struct VisualEffectBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .hudWindow
+        view.material = .popover
         view.blendingMode = .behindWindow
         view.state = .active
-        view.isEmphasized = true
+        view.isEmphasized = false
         return view
     }
 
