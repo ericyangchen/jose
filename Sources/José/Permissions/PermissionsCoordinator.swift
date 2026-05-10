@@ -19,6 +19,16 @@ enum SystemPermission: String, CaseIterable, Identifiable {
         }
     }
 
+    /// True if recording / pasting still works fine without this permission.
+    /// Optional permissions get an "(Optional)" badge in the Permissions
+    /// pane so the user doesn't think a Denied row blocks core functions.
+    var isOptional: Bool {
+        switch self {
+        case .microphone, .accessibility: false
+        case .inputMonitoring: true
+        }
+    }
+
     var rationale: String {
         switch self {
         case .microphone:
@@ -26,7 +36,7 @@ enum SystemPermission: String, CaseIterable, Identifiable {
         case .accessibility:
             "Required to paste the transcript at your cursor (synthesizes ⌘V into the focused app)."
         case .inputMonitoring:
-            "Optional. Only used for the Esc-to-cancel shortcut while recording. The hotkey itself works without it."
+            "Only used for the Esc-to-cancel shortcut while recording. The hotkey itself works without this — leaving it Denied has no effect on transcription."
         }
     }
 
