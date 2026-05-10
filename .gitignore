@@ -1,0 +1,59 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# xcodegen output (regenerable from project.yml)
+José.xcodeproj/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+Packages/
+*.xcodeproj/project.xcworkspace/
+
+# Logs and temp
+*.log
+*.tmp
+tmp/
+
+# OpenAI keys / secrets — never commit
+*.env
+.env.*
+secrets.json
+
+# Generated assets that should be regenerated, not tracked
+*.icns.tmp
+AppIcon.iconset/
+
+# VAD conversion workspace (we keep the .mlmodel output, not the working dir)
+Audio/VAD/.venv/
+Audio/VAD/silero-vad-src/
+*.onnx
+
+# Project-private docs (per user request)
+jose-context-handoff.md
+jose-design-spec.md
+
+# Plan file (lives in ~/.claude, but in case anyone copies it here)
+implement-jose-*.md
