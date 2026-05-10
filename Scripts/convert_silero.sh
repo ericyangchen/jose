@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 VAD_DIR="Sources/José/Audio/VAD"
 WORK_DIR="$VAD_DIR/.work"
-VENV_DIR="$VAD_DIR/.venv312"
+VENV_DIR="$VAD_DIR/.venv"
 JIT_PATH="$WORK_DIR/silero_vad.jit"
 MLPACKAGE_PATH="$VAD_DIR/SileroVADModel.mlpackage"
 
@@ -29,6 +29,16 @@ if ! command -v "$PY" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Sanity-check an existing venv is actually 3.12 — if we find one built with
+# a different interpreter (likely a stale 3.13 from an earlier run), wipe it.
+if [ -d "$VENV_DIR" ]; then
+    venv_py=$("$VENV_DIR/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "broken")
+    if [ "$venv_py" != "3.12" ]; then
+        echo "Existing venv is python $venv_py — recreating with $PY..."
+        rm -rf "$VENV_DIR"
+    fi
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating Python 3.12 venv at $VENV_DIR..."
     "$PY" -m venv "$VENV_DIR"
@@ -46,4 +56,4 @@ python3 "$VAD_DIR/convert_silero.py" "$JIT_PATH" "$MLPACKAGE_PATH"
 
 deactivate
 echo
-echo "Done. Wrote $MLMODEL_PATH"
+echo "Done. Wrote $MLPACKAGE_PATH"

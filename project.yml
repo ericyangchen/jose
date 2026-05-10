@@ -37,7 +37,6 @@ targets:
           - "Audio/VAD/convert_silero.py"
           - "Audio/VAD/README.md"
           - "Audio/VAD/.venv/**"
-          - "Audio/VAD/.venv312/**"
           - "Audio/VAD/.work/**"
           - "**/*.pyc"
           - "**/__pycache__/**"
