@@ -132,6 +132,18 @@ final class HUDController {
         let hosting = NSHostingView(rootView: HUDView(model: model))
         hosting.frame = NSRect(origin: .zero, size: initialSize)
         hosting.autoresizingMask = [.width, .height]
+
+        // Stop SwiftUI from publishing an intrinsic content size back to
+        // AppKit. The HUDView's outer frame uses .infinity to fill the
+        // window, which without this flag drives NSHostingView to report
+        // greatestFiniteMagnitude as its preferred width — AppKit then
+        // tries to grow the window to fit, the SwiftUI view re-fills,
+        // and the loop trips
+        // `NSGenericException: ...needing another Update Constraints in
+        // Window pass`.
+        if #available(macOS 13.0, *) {
+            hosting.sizingOptions = []
+        }
         panel.contentView = hosting
 
         self.window = panel
