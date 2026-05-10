@@ -1,6 +1,10 @@
-# José
+<p align="center">
+  <img src="Resources/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="128" alt="José app icon">
+</p>
 
-> **Hold and Say.** A native macOS dictation app for engineers who code-switch.
+<h1 align="center">José</h1>
+
+<p align="center"><strong>Hold and Say.</strong> A native macOS dictation app for engineers who code-switch.</p>
 
 `José` is a menu-bar dictation app tuned for software engineers who mix Traditional Chinese and English in the same sentence. Hold a hotkey, talk, release — your transcript is pasted at the cursor. Backed by OpenAI `gpt-4o-transcribe`. Bring your own key.
 
