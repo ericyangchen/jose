@@ -2,127 +2,85 @@
 
 > **Hold and Say.** A native macOS dictation app for engineers who code-switch.
 
-`José` is a menu-bar dictation app tuned for software engineers who frequently mix Traditional Chinese and English in the same sentence. Hold a hotkey, talk, release — your transcript is pasted at the cursor. Backed by OpenAI `gpt-4o-transcribe`. Bring your own key.
+`José` is a menu-bar dictation app tuned for software engineers who mix Traditional Chinese and English in the same sentence. Hold a hotkey, talk, release — your transcript is pasted at the cursor. Backed by OpenAI `gpt-4o-transcribe`. Bring your own key.
 
 ---
 
-## Highlights
+## Install
 
-- **Built for code-switching** — default prompt + tech vocabulary list is tuned so `把這個 component refactor 成 functional 的` comes out right.
-- **Two hotkeys, two behaviors.**
-  - **A** — *Transcribe & Paste:* writes the transcript to the clipboard, then synthesizes ⌘V at the cursor.
-  - **B** — *Transcribe & Copy:* writes to the clipboard only.
-- **Hold-to-talk OR toggle.** Per-hotkey choice. **Fn (globe key)** is the default for slot A in hold mode.
-- **Native menu-bar app, no Dock icon.** Floating Dynamic-Island-style pill shows recording state, animated waveform, elapsed timer, then a 3-dot processing indicator.
-- **BYOK.** Your OpenAI key stays in the macOS Keychain. Audio goes directly to OpenAI; no third-party server.
-- **No telemetry, no always-on listening.** Hotkey-triggered, zero in the background.
+1. **Download** the latest `José-<version>.zip` from the [Releases page](https://github.com/ericyangchen/jose/releases).
+2. **Unzip** and drag `José.app` into `/Applications/`.
+3. **Bypass Gatekeeper** — the build is unsigned, so macOS will refuse to open it the first time. Run once:
+   ```bash
+   xattr -d com.apple.quarantine /Applications/José.app
+   ```
+   *(Or right-click → **Open** → confirm.)*
+4. **Launch José.** Settings opens automatically the first time.
 
----
+## First launch
 
-## Install (for users)
+You'll go through three quick steps:
 
-### 1. Download
+1. **Paste your OpenAI API key** ([create one here](https://platform.openai.com/api-keys)). Click **Test** to verify it, then **Save** — the key is stored in your macOS Keychain.
+2. **Pick a hotkey** in Settings → Hotkeys. Default is **Fn / 🌐**.
+3. **Grant permissions** when macOS prompts on first recording:
+   - **Microphone** — to capture your voice.
+   - **Accessibility** — to paste at the cursor.
 
-Grab `José-<version>.zip` from the [Releases page](https://github.com/ericyangchen/jose/releases) and unzip it. Drag `José.app` into `/Applications/`.
+## How to use
 
-### 2. Bypass Gatekeeper (one-time)
-
-The build is unsigned — Apple Developer Program costs $99/yr and José doesn't pay it. macOS will refuse to open it the first time. Run this once:
-
-```bash
-xattr -d com.apple.quarantine /Applications/José.app
-```
-
-Or right-click the app in Finder → **Open** → confirm the warning dialog.
-
-### 3. First launch — BYOK + permissions
-
-When you launch José for the first time:
-
-1. **Welcome window** asks for your OpenAI API key. Paste it (you can [create one here](https://platform.openai.com/api-keys)) and click **Test** — José validates against `/v1/models`. Click **Save**; the key goes into your macOS Keychain.
-2. **Settings opens automatically** so you can rebind the hotkey, pick a model, configure spoken languages, etc. Close it whenever you're ready.
-3. macOS will prompt for **Microphone** and **Accessibility** permissions on first hotkey press. Grant both — Microphone to capture your voice, Accessibility so José can synthesize ⌘V into the focused app.
-
-### 4. Use it
-
-Hold the hotkey (default **Fn**), speak (mix Chinese and English freely), release. Within ~3 seconds your transcript is pasted at the cursor.
-
-> **Heads up about the Fn key**: System Settings → Keyboard → "Press 🌐 key to" needs to be set to **"Do Nothing"** or **"Change Input Source"**. If it's set to "Show Emoji & Symbols" or "Start Dictation," that'll fight José's hold-to-talk. You can also rebind to a different key in Settings → Hotkeys.
-
----
-
-## Settings overview
-
-Click the menu-bar icon → **Settings…** to open the configuration window.
-
-| Pane | What's there |
+| Action | What happens |
 |---|---|
-| **General** | Launch at login, show in Dock, show usage estimate in dropdown |
-| **Hotkeys** | Bind slot A and B; pick hold or toggle mode |
-| **Audio** | Choose a non-default microphone |
-| **Transcription** | Pick `gpt-4o-transcribe` ($0.36/hr) or `gpt-4o-mini-transcribe` ($0.18/hr); set spoken languages; edit system prompt; replace API key |
-| **Vocabulary** | Toggle dev categories or add custom terms |
-| **Permissions** | Live status of Microphone, Accessibility, and (optional) Input Monitoring |
-| **About** | Version + license |
+| **Hold Fn**, speak, release | Transcribes and pastes at cursor |
+| **Slot B** (you bind it) | Transcribes to clipboard only — no auto-paste |
+| **Esc** while recording | Cancels (requires Input Monitoring) |
 
----
+> **Fn key tip**: macOS's default Fn behavior fights hold-to-talk. Open System Settings → Keyboard → "Press 🌐 key to" and set it to *"Do Nothing"* or *"Change Input Source."* If you'd rather use something else, rebind in Settings → Hotkeys (Right Option, ⌘⇧Space, etc.).
+
+## Features
+
+- **Bilingual transcription** — zh-tw + en, mixed in the same sentence
+- **Two slots**: paste-and-copy (slot A) / copy-only (slot B), each with hold-to-talk OR toggle mode
+- **Native menu-bar app**, no Dock icon, ignorable until you press the hotkey
+- **Animated waveform pill** at the bottom of the screen while recording
+- **Configurable**: spoken languages, technical vocabulary, system prompt, model choice
+- **BYOK** — your key, your bill, no proxy server in the middle
 
 ## Privacy
 
-- **Bring Your Own Key.** Your OpenAI API key sits in your macOS Keychain. It's used only to call OpenAI directly; no third-party server.
-- **No telemetry, no analytics, no crash reporter.** No code in this app phones home.
-- **Audio uploaded to OpenAI for transcription.** The temp `.m4a` file is deleted as soon as the response arrives. OpenAI's API terms (distinct from ChatGPT's) state that API data is not used for training by default.
-- **Transcripts stay in your clipboard** so tools like [Raycast](https://www.raycast.com/) clipboard history can pick them up. Toggle "Restore previous clipboard" in Settings → Output if you'd rather not.
+- **BYOK**: API key in your macOS Keychain. Audio goes directly to OpenAI; no third-party server.
+- **No telemetry, no analytics, no crash reporter.**
+- Per [OpenAI's API terms](https://openai.com/policies/api-data-usage-policies), API audio is *not* used to train models.
+- **Transcripts stay in your clipboard** so [Raycast](https://www.raycast.com/) clipboard history catches them. Flip "Restore previous clipboard" in Settings → Output to opt out.
 
----
+## Settings overview
 
-## Building from source (for contributors)
+The Settings window has seven panes:
 
-```bash
-git clone https://github.com/ericyangchen/jose.git
-cd jose
-./Scripts/setup.sh        # installs xcodegen via brew, generates José.xcodeproj
-open José.xcodeproj       # ⌘R to run; Product → Archive to ship
-```
-
-To produce a release zip ready to upload to GitHub:
-
-```bash
-./Scripts/release.sh
-# → .build/release/José-<version>.zip + SHA-256
-```
-
-To regenerate the Silero VAD Core ML model (only needed if you're updating to a newer Silero release — the conversion script requires Python 3.12; coremltools 8.x's native libs don't ship for 3.13 yet):
-
-```bash
-./Scripts/convert_silero.sh
-```
-
----
+| Pane | What's there |
+|---|---|
+| **General** | Launch at login, show in Dock, menu-bar icon visibility |
+| **Hotkeys** | Bind slots A & B; hold or toggle mode |
+| **Audio** | Pick a non-default microphone |
+| **Transcription** | Model (`gpt-4o-transcribe` $0.36/hr vs `gpt-4o-mini-transcribe` $0.18/hr), spoken languages, system prompt, API key |
+| **Vocabulary** | Toggle bundled dev categories, add custom terms |
+| **Permissions** | Live status of Microphone, Accessibility, Input Monitoring |
+| **About** | Version + license |
 
 ## Known limitations (v1)
 
-- **Unsigned build.** Until José gets a Developer ID, every fresh download needs the Gatekeeper bypass shown above.
-- **Right Option may conflict with some keyboard layouts** (US-International typing accented characters, Pinyin, etc.). Fn is the default for that reason; rebind in Settings → Hotkeys if you need.
-- **Esc-to-cancel during recording requires Input Monitoring permission**, which macOS auto-denies for ad-hoc-signed builds. Recording itself works fine without it; only the cancel shortcut is disabled.
-- **Streaming transcription is v1.1.** Current transcription is the batch endpoint — typically 2–4 s after release. The Realtime API path (~500 ms latency) is the next major upgrade.
-
----
+- **Unsigned build.** Until José ships with an Apple Developer ID, every fresh download needs the `xattr` bypass.
+- **Esc-to-cancel needs Input Monitoring** — auto-denied by macOS for ad-hoc-signed builds. Recording itself works fine without it. To enable, drag José.app into the Input Monitoring list manually via the `+` button in System Settings (Settings → Permissions has a **"Show José.app in Finder"** helper button).
+- **Streaming transcription** lands in v1.1. Current latency is 2–4 s after release.
 
 ## Roadmap
 
-- **v1.1** — Streaming transcription via `/v1/realtime`; partial-text HUD; Sparkle auto-update
-- **v2** — `gpt-4o-mini` post-process pass to clean filler words; per-app prompt presets; optional local history
+- **v1.1** — Streaming transcription via `/v1/realtime` (~500 ms latency); Sparkle auto-update.
+- **v2** — `gpt-4o-mini` post-process pass to clean filler words; per-app prompt presets; optional local history.
 
 ---
 
-## Contributing
-
-PRs welcome. Code style:
-- Swift 5.10+, SwiftUI primary with AppKit bridges
-- macOS 14+ deployment target
-- `async/await`, no Combine for new code
-- One test pass before pushing: `xcodegen generate && xcodebuild -scheme José -configuration Debug build`
+Build instructions, release process, and code style live in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
