@@ -23,7 +23,7 @@ final class HUDViewModel {
     var elapsed: TimeInterval = 0
     var pulse: Bool = false
 
-    static let barCount = 22
+    static let barCount = 26
 
     func pushLevel(_ value: Float) {
         let clamped = max(0, min(1, value))

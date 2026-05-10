@@ -16,9 +16,9 @@ struct WaveformView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let spacing: CGFloat = 1.5
+            let spacing: CGFloat = 1
             let totalSpacing = spacing * CGFloat(barCount - 1)
-            let barWidth = max(1.5, (geo.size.width - totalSpacing) / CGFloat(barCount))
+            let barWidth = max(1, (geo.size.width - totalSpacing) / CGFloat(barCount))
             let height = geo.size.height
 
             HStack(alignment: .center, spacing: spacing) {
