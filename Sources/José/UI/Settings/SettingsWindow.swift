@@ -42,11 +42,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "José Settings"
+        window.title = ""
         window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
         window.contentViewController = host
-        window.setContentSize(NSSize(width: 860, height: 580))
-        window.minSize = NSSize(width: 720, height: 480)
+        window.setContentSize(NSSize(width: 920, height: 620))
+        window.minSize = NSSize(width: 760, height: 520)
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -71,14 +73,40 @@ private struct SettingsRootView: View {
         HStack(spacing: 0) {
             SettingsSidebar(selection: $selection)
                 .background(.ultraThinMaterial)
-            Divider()
+
+            // Hairline divider — barely visible, just enough separation
+            // between sidebar and content. Replaces the heavy SwiftUI
+            // Divider() which read as a hard line.
+            Rectangle()
+                .fill(Color.primary.opacity(0.06))
+                .frame(width: 1)
+
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(contentBackground)
         }
-        .frame(minWidth: 720, minHeight: 480)
+        .frame(minWidth: 760, minHeight: 520)
         .onChange(of: selection) { _, newValue in
             onPaneChange(newValue)
         }
+    }
+
+    /// Subtle gradient backdrop behind the content cards — the cards'
+    /// thinMaterial picks up a faint warm tint from this so the pane
+    /// doesn't read as a flat slab of white/black.
+    private var contentBackground: some View {
+        ZStack {
+            Color(NSColor.windowBackgroundColor)
+            LinearGradient(
+                colors: [
+                    Color(red: 0.949, green: 0.659, blue: 0.769).opacity(0.05),
+                    Color(red: 0.561, green: 0.737, blue: 0.910).opacity(0.05)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
     }
 
     @ViewBuilder
