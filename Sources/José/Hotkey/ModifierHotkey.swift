@@ -23,7 +23,6 @@ final class ModifierHotkey {
     private var localMonitor: Any?
 
     private var lastFlags: UInt = 0
-    private var hasSeenFirstEvent: Bool = false
     private var isDown: Bool = false
     private var armingTask: Task<Void, Never>?
 
@@ -49,14 +48,14 @@ final class ModifierHotkey {
             return
         }
 
-        // Don't seed lastFlags from NSEvent.modifierFlags — that returns
-        // the *collapsed* public bits which don't carry left/right
-        // device-specific masks. If the user happens to be holding the
-        // hotkey at start time, the first real flagsChanged event would
-        // produce a spurious .down (prev=0, curr=mask). Wait for the
-        // first event to seed instead.
-        hasSeenFirstEvent = false
-        lastFlags = 0
+        // Seed lastFlags from the current modifier state. Eating the
+        // first event (the previous fix) caused the user's first press
+        // after launch to be silently dropped — the press itself *was*
+        // the seed event. Use NSEvent.modifierFlags's public bits to
+        // figure out whether the watched modifier is currently held,
+        // and write the corresponding device-specific mask bit so the
+        // first real transition is detected correctly.
+        lastFlags = Self.currentRawFlags(forMask: mask)
 
         // Two monitors: global fires while another app is focused, local fires
         // when José itself has focus (global skips own-app events).
@@ -91,15 +90,6 @@ final class ModifierHotkey {
         let prev = lastFlags
         lastFlags = flags
 
-        // First flagsChanged after start() — seed lastFlags but don't
-        // emit. Otherwise a user already holding the hotkey when José
-        // launches (or restarts the hotkey manager) gets a phantom
-        // .down with no matching .up.
-        guard hasSeenFirstEvent else {
-            hasSeenFirstEvent = true
-            return
-        }
-
         let bitWasSet = (prev & mask) == mask
         let bitIsSet = (flags & mask) == mask
 
@@ -107,6 +97,33 @@ final class ModifierHotkey {
             handleDown()
         } else if bitWasSet && !bitIsSet {
             handleUp()
+        }
+    }
+
+    /// Best-effort read of the current modifier state at start time.
+    /// `NSEvent.modifierFlags` is a public-bit set (no left/right
+    /// distinction); this maps it back into the device-specific mask
+    /// space so `lastFlags` is seeded with the right bit when the user
+    /// is *already* holding the hotkey at hotkey-manager start. For
+    /// left/right-distinct modifiers we conservatively assume the
+    /// watched side is the one held — worst case: one stray .up event
+    /// if it was actually the other side, harmlessly ignored because
+    /// `isDown` is false.
+    private static func currentRawFlags(forMask mask: UInt) -> UInt {
+        let publicFlags = NSEvent.modifierFlags
+        switch mask {
+        case ModifierMask.fn:
+            return publicFlags.contains(.function) ? mask : 0
+        case ModifierMask.leftOption, ModifierMask.rightOption:
+            return publicFlags.contains(.option) ? mask : 0
+        case ModifierMask.leftCommand, ModifierMask.rightCommand:
+            return publicFlags.contains(.command) ? mask : 0
+        case ModifierMask.leftShift, ModifierMask.rightShift:
+            return publicFlags.contains(.shift) ? mask : 0
+        case ModifierMask.leftControl, ModifierMask.rightControl:
+            return publicFlags.contains(.control) ? mask : 0
+        default:
+            return 0
         }
     }
 
