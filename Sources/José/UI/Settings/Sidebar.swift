@@ -33,49 +33,54 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// 180pt sidebar list. Selected row is highlighted with a rounded
-/// `accent-primary` (#8B7DFF) capsule per spec §4.7.
+/// 180pt sidebar. Selection highlight is `accent-primary` (#8B7DFF) per
+/// spec §4.7. We avoid `List(selection:)` because `.listStyle(.sidebar)`
+/// draws the system blue selection rectangle under our custom capsule on
+/// a separate frame, producing a blue → purple flash + perceived lag.
 struct SettingsSidebar: View {
     @Binding var selection: SettingsPane
 
     var body: some View {
-        List(selection: $selection) {
+        VStack(alignment: .leading, spacing: 2) {
             ForEach(SettingsPane.allCases) { pane in
-                SidebarRow(pane: pane, isSelected: pane == selection)
-                    .tag(pane)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4))
+                SidebarRow(pane: pane, isSelected: pane == selection) {
+                    selection = pane
+                }
             }
+            Spacer(minLength: 0)
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .frame(width: 180)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
+        .frame(width: 180, alignment: .top)
     }
 }
 
 private struct SidebarRow: View {
     let pane: SettingsPane
     let isSelected: Bool
+    let onSelect: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: pane.systemImage)
-                .frame(width: 18)
-                .foregroundStyle(isSelected ? .white : .secondary)
-            Text(pane.title)
-                .font(.system(size: 13))
-                .foregroundStyle(isSelected ? .white : .primary)
-            Spacer()
+        Button(action: onSelect) {
+            HStack(spacing: 8) {
+                Image(systemName: pane.systemImage)
+                    .frame(width: 18)
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                Text(pane.title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color(red: 0x8B / 255.0, green: 0x7D / 255.0, blue: 1.0) : .clear)
+            )
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isSelected ? Color(red: 0x8B / 255.0, green: 0x7D / 255.0, blue: 1.0) : .clear)
-        )
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
     }
 }
 
