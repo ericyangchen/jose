@@ -137,19 +137,28 @@ final class AppCoordinator: HotkeyManagerDelegate {
             guard case .arming = stateModel.state else { return }
         }
 
+        // Show the HUD *before* awaiting the audio engine — engine startup
+        // takes ~50–80 ms (after the VAD pre-warm in AudioEngine.init) but
+        // the user wants instant visual feedback. The level stream
+        // continuation is registered immediately on makeLevelStream(); it
+        // simply doesn't yield values until the engine starts producing
+        // buffers. Bars stay at the silence baseline for the brief
+        // pre-start window, then come alive.
+        hud?.show(.recording(audioLevels: audioEngine.makeLevelStream()))
+
         do {
             try await audioEngine.start()
-            // Engine start can take 50–200 ms; the user might have released
-            // (or pressed Esc) during that await. If state is no longer
-            // .arming, we have no way to stop the engine via the normal
-            // path (no further .up event will arrive), so cancel here.
+            // Engine start can take a few tens of ms; the user might have
+            // released (or pressed Esc) during that await. If state is no
+            // longer .arming, we have no way to stop the engine via the
+            // normal path (no further .up event will arrive), so cancel.
             guard case .arming = stateModel.state else {
                 Logger.coordinator.debug("state changed during audio start — cancelling")
                 await audioEngine.cancel()
+                hud?.hide()
                 return
             }
             stateModel.transition(to: .recording(slot: slot, since: .now))
-            hud?.show(.recording(audioLevels: audioEngine.makeLevelStream()))
             scheduleSoftLimit(slot: slot)
             scheduleHardLimit(slot: slot)
         } catch {

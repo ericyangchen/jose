@@ -154,14 +154,12 @@ final class HUDController {
     }
 
     private func consumeLevels(_ stream: AsyncStream<Float>) {
-        // Audio levels arrive at ~33 Hz (one per 30 ms chunk). At that rate
-        // the 24-bar buffer fills in under a second, so the waveform looks
-        // like a finished animation the moment recording starts. Throttle
-        // to ~8 Hz — peak energy across each ~120 ms window — so the bars
-        // accumulate visibly from right to left over ~3 s. The smoothing
-        // tick (60 Hz, see startSmoothingTick) eases between samples so
-        // the bars glide instead of stepping.
-        let groupSize = 4
+        // Audio levels arrive at ~33 Hz (one per 30 ms chunk). Throttle
+        // to ~3 Hz — peak energy across each ~330 ms window — so the
+        // 24-bar buffer fills over ~8 s of speech. The smoothing tick
+        // (60 Hz, see startSmoothingTick) eases between samples so the
+        // bars still glide rather than stepping every 330 ms.
+        let groupSize = 11
         levelTask = Task { [weak self] in
             var bucket: [Float] = []
             bucket.reserveCapacity(groupSize)
@@ -293,13 +291,15 @@ final class HUDController {
 
     private func animateIn(_ panel: HUDWindow) {
         let target = panel.frame
-        let start = NSRect(x: target.origin.x, y: target.origin.y - 20, width: target.width, height: target.height)
+        // Tighter pop: shorter rise distance + faster duration so the pill
+        // appears nearly instantly. 0.13 s feels alive; 0.25 s felt slow.
+        let start = NSRect(x: target.origin.x, y: target.origin.y - 8, width: target.width, height: target.height)
         panel.setFrame(start, display: false)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.25
+            ctx.duration = 0.13
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().setFrame(target, display: true)
             panel.animator().alphaValue = 1
