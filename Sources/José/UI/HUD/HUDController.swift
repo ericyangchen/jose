@@ -135,11 +135,24 @@ final class HUDController {
     }
 
     private func consumeLevels(_ stream: AsyncStream<Float>) {
+        // Audio levels arrive at ~33 Hz (one per 30 ms chunk). At that rate
+        // the 30-bar buffer fills in under a second, so the waveform looks
+        // like a finished animation the moment recording starts. Throttle
+        // to ~7 Hz instead — peak energy across each ~140 ms window — so
+        // the bars accumulate visibly from right to left over ~4 s.
+        let groupSize = 5
         levelTask = Task { [weak self] in
+            var bucket: [Float] = []
+            bucket.reserveCapacity(groupSize)
             for await value in stream {
                 if Task.isCancelled { break }
-                await MainActor.run {
-                    self?.model.pushLevel(value)
+                bucket.append(value)
+                if bucket.count >= groupSize {
+                    let peak = bucket.max() ?? 0
+                    bucket.removeAll(keepingCapacity: true)
+                    await MainActor.run {
+                        self?.model.pushLevel(peak)
+                    }
                 }
             }
         }

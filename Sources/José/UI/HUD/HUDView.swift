@@ -50,12 +50,15 @@ struct HUDView: View {
                 VisualEffectBackground()
                     .clipShape(Capsule())
 
+                // Padding is per-variant — the recording pill needs side
+                // padding for its [dot, waveform, timer] HStack, but the
+                // 36×36 processing pill is too narrow for any horizontal
+                // padding (it'd squeeze the spinner into negative pixels
+                // and clip it to a sliver).
                 content
-                    .padding(.horizontal, 16)
             }
             .padding(Self.haloBleed)
             .overlay(
-                // Halo sits ON the pill's edge (inside the bleed area).
                 Group {
                     if showsHalo {
                         SiriHalo()
@@ -104,9 +107,13 @@ struct HUDView: View {
                 .monospacedDigit()
                 .foregroundStyle(.primary)
         }
+        .padding(.horizontal, 16)
     }
 
     private var processingContent: some View {
+        // No outer padding — the processing pill is square (~36×36) and
+        // any horizontal padding squashes the indeterminate ProgressView
+        // into a clipped sliver. Centered in the parent ZStack.
         ProgressView()
             .controlSize(.small)
             .progressViewStyle(.circular)
@@ -118,6 +125,7 @@ struct HUDView: View {
             .foregroundStyle(color)
             .lineLimit(1)
             .truncationMode(.tail)
+            .padding(.horizontal, 16)
     }
 
     private func formatTimer(_ seconds: TimeInterval) -> String {
