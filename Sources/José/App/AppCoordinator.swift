@@ -182,8 +182,12 @@ final class AppCoordinator: HotkeyManagerDelegate {
             return
         }
 
+        // Don't switch the HUD to .processing yet — runTranscriptionPipeline
+        // first stops audio + checks VAD; if no speech was detected we
+        // want to morph the recording pill directly into a same-width
+        // notice pill, not flash through the tiny spinner pill in
+        // between.
         stateModel.transition(to: .processing(slot: slot))
-        hud?.show(.processing)
 
         pendingTranscriptionTask = Task { [weak self] in
             await self?.runTranscriptionPipeline(slot: slot, duration: duration)
@@ -197,12 +201,17 @@ final class AppCoordinator: HotkeyManagerDelegate {
         if !hadSpeech {
             Logger.coordinator.info("VAD ratio under \(Int(self.allSilenceSpeechRatioGate * 100))% — likely silence, discarding")
             try? FileManager.default.removeItem(at: audioURL)
+            // Same-width notice pill — morphs in place from the recording
+            // pill instead of flashing through a smaller spinner.
             hud?.show(.notice(message: "No speech detected"))
             stateModel.transition(to: .idle)
-            try? await Task.sleep(for: .milliseconds(1200))
+            try? await Task.sleep(for: .milliseconds(1500))
             hud?.hide()
             return
         }
+
+        // Has speech — switch to the spinner pill while the upload is in flight.
+        hud?.show(.processing)
 
         do {
             let prompt = PromptBuilder.build(from: settings)
