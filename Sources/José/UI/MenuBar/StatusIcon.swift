@@ -59,14 +59,13 @@ private struct StatusIconView: View {
         }
     }
 
-    /// Three bars sampled from the deeper-saturation Siri palette (the
-    /// same one the HUD waveform uses, not the soft halo pastels). The
-    /// menu bar's translucent dark/light mode would wash out lighter
-    /// stops; these read clearly against both.
+    /// Three bars sampled from a vivid Siri-orb palette — hot pink → vivid
+    /// purple-blue → electric cyan. Saturated enough to read like the
+    /// actual iOS Siri animation rather than a pastel approximation.
     private static let siriBarColors: [Color] = [
-        Color(red: 0.92, green: 0.40, blue: 0.62),  // deep rose (t=0)
-        Color(red: 0.42, green: 0.49, blue: 0.95),  // purple→blue interp (t=0.5)
-        Color(red: 0.30, green: 0.78, blue: 0.84)   // deeper cyan (t=1)
+        Color(red: 1.00, green: 0.28, blue: 0.58),  // hot pink/magenta (t=0)
+        Color(red: 0.55, green: 0.42, blue: 0.98),  // electric purple-blue (t=0.5)
+        Color(red: 0.20, green: 0.92, blue: 0.95)   // bright cyan (t=1)
     ]
 
     private func recordingLevels(for level: Float) -> [Double] {
@@ -103,20 +102,30 @@ private struct StatusIconView: View {
         }
     }
 
+    /// Three sequentially-pulsing dots — same pattern as the HUD pill's
+    /// processing state, so the menu-bar icon and the pill read as one
+    /// coordinated indicator. Each dot pulses opacity + scale on a sine
+    /// curve, staggered by 33 % of the cycle so the pulse walks
+    /// left → middle → right.
     private func drawSpinner(context: GraphicsContext, size: CGSize, phase: Double) {
-        let center = CGPoint(x: size.width / 2, y: size.height / 2)
-        let radius: CGFloat = 6
-        let dotRadius: CGFloat = 1.6
         let dotCount = 3
+        let baseRadius: CGFloat = 2
+        let spacing: CGFloat = 3
+        let totalWidth = CGFloat(dotCount) * baseRadius * 2 + CGFloat(dotCount - 1) * spacing
+        let originX = (size.width - totalWidth) / 2
+        let centerY = size.height / 2
+
         for i in 0..<dotCount {
-            let angle = (Double(i) / Double(dotCount)) * .pi * 2 + phase * .pi * 2
-            let x = center.x + cos(angle) * radius
-            let y = center.y + sin(angle) * radius
-            let opacity = 0.35 + 0.65 * (Double(i) / Double(dotCount - 1))
-            let rect = CGRect(
-                x: x - dotRadius, y: y - dotRadius,
-                width: dotRadius * 2, height: dotRadius * 2
-            )
+            // Each dot's local phase walks ahead by 0.33 of the cycle so
+            // peak intensity sweeps the row in order.
+            let local = (phase + Double(i) * 0.33).truncatingRemainder(dividingBy: 1.0)
+            let intensity = sin(max(0, local) * .pi)  // 0 → 1 → 0 across one cycle
+            let opacity = 0.3 + 0.7 * intensity
+            let scale = 0.6 + 0.4 * intensity
+
+            let centerX = originX + baseRadius + CGFloat(i) * (baseRadius * 2 + spacing)
+            let r = baseRadius * scale
+            let rect = CGRect(x: centerX - r, y: centerY - r, width: r * 2, height: r * 2)
             context.fill(Path(ellipseIn: rect), with: .color(.primary.opacity(opacity)))
         }
     }
