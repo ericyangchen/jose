@@ -48,6 +48,11 @@ struct PermissionsPane: View {
         }
         .onAppear {
             permissions.refresh()
+            // SwiftUI can fire onAppear more than once for the same view
+            // instance (e.g. when the pane is re-selected without the
+            // previous view being deallocated). Invalidate any prior
+            // timer first so we never leak repeating callbacks.
+            refreshTimer?.invalidate()
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak permissions] _ in
                 Task { @MainActor in permissions?.refresh() }
             }

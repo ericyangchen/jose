@@ -63,7 +63,7 @@ final class PermissionsCoordinator {
     private(set) var accessibility: PermissionStatus = .notDetermined
     private(set) var inputMonitoring: PermissionStatus = .notDetermined
 
-    init() {
+    private init() {
         refresh()
     }
 
