@@ -47,9 +47,15 @@ secrets.json
 AppIcon.iconset/
 
 # VAD conversion workspace (we keep the .mlmodel output, not the working dir)
-Audio/VAD/.venv/
-Audio/VAD/silero-vad-src/
+**/Audio/VAD/.venv/
+**/Audio/VAD/.work/
+**/Audio/VAD/silero-vad-src/
 *.onnx
+*.jit
+
+# Editor
+.vscode/
+.idea/
 
 # Project-private docs (per user request)
 jose-context-handoff.md
