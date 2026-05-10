@@ -56,7 +56,7 @@ final class Settings {
     /// Bump when DefaultPrompt.md changes meaningfully. Existing installs
     /// with a stored prompt below this version are auto-refreshed from
     /// the bundle on next launch (unless the user has already edited it).
-    static let currentBundledPromptVersion: Int = 2
+    static let currentBundledPromptVersion: Int = 3
 
     // MARK: General
     var launchAtLogin: Bool {
@@ -101,6 +101,14 @@ final class Settings {
     }
     var systemPrompt: String {
         didSet { Defaults.set(systemPrompt, for: .systemPrompt) }
+    }
+
+    /// Languages the user actually speaks. Sent to the model as a
+    /// "expect any of these" hint, not a translation target. Free-form
+    /// strings — anything the model recognizes works (e.g. "Traditional
+    /// Chinese", "English", "Japanese", "Cantonese", "Spanish").
+    var spokenLanguages: [String] {
+        didSet { Defaults.set(spokenLanguages, for: .spokenLanguages) }
     }
 
     // MARK: Vocabulary
@@ -166,6 +174,11 @@ final class Settings {
             Defaults.set(Self.currentBundledPromptVersion, for: .bundledPromptVersion)
         }
         self.systemPrompt = resolvedPrompt
+
+        let storedLangs = Defaults.stringArray(for: .spokenLanguages) ?? []
+        self.spokenLanguages = storedLangs.isEmpty
+            ? ["Traditional Chinese", "English"]
+            : storedLangs
 
         let storedCats = (Defaults.stringArray(for: .vocabularyEnabledCategories) ?? [])
             .compactMap(VocabularyCategory.init(rawValue:))

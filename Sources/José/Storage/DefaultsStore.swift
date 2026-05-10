@@ -30,6 +30,7 @@ enum DefaultsKey: String {
     case onboardingCompleted = "onboarding.completed"
 
     case bundledPromptVersion = "transcription.bundledPromptVersion"
+    case spokenLanguages = "transcription.spokenLanguages"
 }
 
 enum Defaults {

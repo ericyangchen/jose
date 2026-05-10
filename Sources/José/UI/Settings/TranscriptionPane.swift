@@ -38,11 +38,36 @@ struct TranscriptionPane: View {
     var body: some View {
         PaneScaffold(title: "Transcription") {
             modelCard
+            languagesCard
             apiKeyCard
             promptCard
         }
         .onAppear {
             maskedKey = Self.mask(KeychainStore.loadAPIKey())
+        }
+    }
+
+    private var languagesCard: some View {
+        SettingsCard("Spoken languages") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Comma-separated. José tells the model to expect these — it will not translate between them. Output stays in whichever language each phrase was actually spoken.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                TextField(
+                    "e.g. Traditional Chinese, English",
+                    text: Binding(
+                        get: { settings.spokenLanguages.joined(separator: ", ") },
+                        set: { newValue in
+                            settings.spokenLanguages = newValue
+                                .split(separator: ",")
+                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                .filter { !$0.isEmpty }
+                        }
+                    )
+                )
+                .textFieldStyle(.roundedBorder)
+            }
         }
     }
 

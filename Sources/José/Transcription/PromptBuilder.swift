@@ -43,6 +43,9 @@ enum PromptBuilder {
     @MainActor
     static func build(from settings: Settings) -> String {
         let systemPrompt = settings.systemPrompt
+        let languages = settings.spokenLanguages
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
         let custom = settings.customVocabulary
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -56,6 +59,7 @@ enum PromptBuilder {
 
         var prompt = compose(
             systemPrompt: systemPrompt,
+            languages: languages,
             categories: enabledCategories,
             defaults: defaults,
             custom: custom
@@ -67,6 +71,7 @@ enum PromptBuilder {
                 enabledCategories.remove(at: idx)
                 prompt = compose(
                     systemPrompt: systemPrompt,
+                    languages: languages,
                     categories: enabledCategories,
                     defaults: defaults,
                     custom: custom
@@ -91,10 +96,20 @@ enum PromptBuilder {
 
     private static func compose(
         systemPrompt: String,
+        languages: [String],
         categories: [VocabularyCategory],
         defaults: DefaultVocabulary,
         custom: [String]
     ) -> String {
+        var sections: [String] = []
+        if !languages.isEmpty {
+            // Phrased as an "expect any of these" hint, NOT a translation
+            // target. The systemPrompt's "do not translate" rule still
+            // governs output language.
+            sections.append("The speaker may use any of: \(languages.joined(separator: ", ")).")
+        }
+        sections.append(systemPrompt)
+
         var terms: [String] = []
         for category in categories {
             terms.append(contentsOf: defaults.terms(for: category))
@@ -102,11 +117,11 @@ enum PromptBuilder {
         terms.append(contentsOf: custom)
         terms = dedupePreservingOrder(terms)
 
-        guard !terms.isEmpty else { return systemPrompt }
+        if !terms.isEmpty {
+            sections.append("Technical terms that may appear: " + terms.joined(separator: ", "))
+        }
 
-        return systemPrompt
-            + "\n\nCommon technical terms in this user's vocabulary:\n"
-            + terms.joined(separator: ", ")
+        return sections.joined(separator: "\n\n")
     }
 
     /// Last-resort fallback when even an all-categories-dropped prompt is over
