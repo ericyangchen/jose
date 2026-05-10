@@ -1,10 +1,10 @@
 import Foundation
 import AppKit
 
-/// Routes a transcription to the clipboard and (for slot A) simulates ⌘V.
-/// Worker B4 owns ClipboardManager and PasteSimulator implementations.
 @MainActor
 final class OutputRouter {
+    private let clipboard = ClipboardManager()
+
     init() {}
 
     func deliver(text: String, action: RecordingAction) async {
@@ -14,19 +14,17 @@ final class OutputRouter {
             return
         }
 
-        // Worker B4 replaces this with the real ClipboardManager which honors
-        // Settings.shared.restorePreviousClipboard.
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(trimmed, forType: .string)
-
-        switch action {
-        case .copyOnly:
-            Logger.output.info("copied to clipboard (\(trimmed.count) chars)")
-        case .pasteAndCopy:
-            // Worker B4 replaces this with PasteSimulator.send().
-            Logger.output.warning(
-                "PasteSimulator stub — feat/output not merged yet; clipboard set but ⌘V not sent"
-            )
+        if Settings.shared.restorePreviousClipboard {
+            await clipboard.writeAndOptionallyRestore(trimmed, restoreAfter: .milliseconds(500))
+        } else {
+            clipboard.write(trimmed)
         }
+
+        if action == .pasteAndCopy {
+            try? await Task.sleep(for: .milliseconds(30))
+            PasteSimulator.send()
+        }
+
+        Logger.output.info("delivered \(trimmed.count) chars (\(action.rawValue))")
     }
 }
