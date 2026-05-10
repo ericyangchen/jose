@@ -7,9 +7,9 @@ cd "$(dirname "$0")/.."
 
 VAD_DIR="Sources/José/Audio/VAD"
 WORK_DIR="$VAD_DIR/.work"
-VENV_DIR="$VAD_DIR/.venv"
+VENV_DIR="$VAD_DIR/.venv312"
 JIT_PATH="$WORK_DIR/silero_vad.jit"
-MLMODEL_PATH="$VAD_DIR/SileroVAD.mlmodel"
+MLPACKAGE_PATH="$VAD_DIR/SileroVADModel.mlpackage"
 
 mkdir -p "$WORK_DIR"
 
@@ -19,9 +19,19 @@ if [ ! -f "$JIT_PATH" ]; then
         https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.jit
 fi
 
+# coremltools 8.x ships native libs for Python 3.10–3.12 only. 3.13 is
+# missing libcoremlpython / libmilstoragepython at the time of writing,
+# which makes mlmodel.save() blow up with "BlobWriter not loaded".
+PY=python3.12
+if ! command -v "$PY" >/dev/null 2>&1; then
+    echo "error: python3.12 is required (coremltools 8.x has no native libs for 3.13 yet)." >&2
+    echo "       brew install python@3.12" >&2
+    exit 1
+fi
+
 if [ ! -d "$VENV_DIR" ]; then
-    echo "Creating Python venv at $VENV_DIR..."
-    python3 -m venv "$VENV_DIR"
+    echo "Creating Python 3.12 venv at $VENV_DIR..."
+    "$PY" -m venv "$VENV_DIR"
 fi
 
 # shellcheck disable=SC1091
@@ -29,10 +39,10 @@ source "$VENV_DIR/bin/activate"
 
 echo "Installing coremltools + torch..."
 pip install --quiet --upgrade pip
-pip install --quiet "coremltools>=8.3,<9" "torch>=2.0" "numpy<2.0" "ml_dtypes>=0.5.0"
+pip install --quiet "coremltools>=8.3,<9" "torch>=2.4,<2.6" "numpy<2.0"
 
 echo "Converting torchscript → Core ML..."
-python3 "$VAD_DIR/convert_silero.py" "$JIT_PATH" "$MLMODEL_PATH"
+python3 "$VAD_DIR/convert_silero.py" "$JIT_PATH" "$MLPACKAGE_PATH"
 
 deactivate
 echo
