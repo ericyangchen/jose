@@ -46,8 +46,9 @@ secrets.json
 *.icns.tmp
 AppIcon.iconset/
 
-# VAD conversion workspace (we keep the .mlmodel output, not the working dir)
+# VAD conversion workspace (we keep the .mlpackage output, not the working dir)
 **/Audio/VAD/.venv/
+**/Audio/VAD/.venv312/
 **/Audio/VAD/.work/
 **/Audio/VAD/silero-vad-src/
 *.onnx
