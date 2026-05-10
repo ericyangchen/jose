@@ -58,6 +58,11 @@ final class Settings {
     /// the bundle on next launch (unless the user has already edited it).
     static let currentBundledPromptVersion: Int = 3
 
+    /// Bump when default hotkey bindings change. Existing installs whose
+    /// stored version is below this get a one-shot reset to the new
+    /// defaults (slot A → Fn). User-customized bindings are preserved.
+    static let currentHotkeyDefaultsVersion: Int = 1
+
     // MARK: General
     var launchAtLogin: Bool {
         didSet { Defaults.set(launchAtLogin, for: .launchAtLogin) }
@@ -148,8 +153,22 @@ final class Settings {
         self.hotkeyBMode = Defaults.string(for: .hotkeyBMode)
             .flatMap(HotkeyMode.init(rawValue:)) ?? .hold
 
-        self.hotkeyAModifierMask = Defaults.uint(for: .hotkeyAModifierMask)
-            ?? ModifierMask.rightOption  // sensible default per spec §3.3
+        // Default slot A binding: Fn (the globe / world key on modern Macs).
+        // First-time installs get Fn; existing installs whose stored
+        // version is below currentHotkeyDefaultsVersion AND who still
+        // have the old Right-Option default get migrated to Fn. Anyone
+        // who changed their binding manually keeps it.
+        let storedHotkeyVersion = Defaults.int(for: .hotkeyDefaultsVersion) ?? 0
+        let storedMaskA = Defaults.uint(for: .hotkeyAModifierMask)
+        if storedHotkeyVersion < Self.currentHotkeyDefaultsVersion,
+           storedMaskA == nil || storedMaskA == ModifierMask.rightOption {
+            self.hotkeyAModifierMask = ModifierMask.fn
+            Defaults.set(ModifierMask.fn, for: .hotkeyAModifierMask)
+        } else {
+            self.hotkeyAModifierMask = storedMaskA ?? ModifierMask.fn
+        }
+        Defaults.set(Self.currentHotkeyDefaultsVersion, for: .hotkeyDefaultsVersion)
+
         self.hotkeyBModifierMask = Defaults.uint(for: .hotkeyBModifierMask)
 
         self.inputDeviceUID = Defaults.string(for: .inputDeviceUID)

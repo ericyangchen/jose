@@ -31,6 +31,7 @@ enum DefaultsKey: String {
 
     case bundledPromptVersion = "transcription.bundledPromptVersion"
     case spokenLanguages = "transcription.spokenLanguages"
+    case hotkeyDefaultsVersion = "hotkey.defaultsVersion"
 }
 
 enum Defaults {
