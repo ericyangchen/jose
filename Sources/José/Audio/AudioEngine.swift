@@ -99,17 +99,18 @@ final class AudioEngine {
     // MARK: - Init
 
     init() {
-        // Pre-warm the SileroVAD instance on the audio queue so the
-        // ~400 ms Core ML model load doesn't sit in front of every
-        // recording. By the time the user presses a hotkey for the
-        // first time, this background task is almost certainly done.
-        // We keep the same instance alive across recordings and just
-        // reset its LSTM state between sessions.
-        audioQueue.async { [self] in
-            if state.vad == nil {
-                state.vad = SileroVAD()
-            }
-        }
+        // Load the SileroVAD Core ML model synchronously at app launch
+        // so the ~400 ms model load is paid once during the launch idle
+        // window instead of every first hotkey press. App launch already
+        // takes a second or two for SwiftUI / NSStatusItem / onboarding;
+        // an extra 400 ms here is invisible.
+        //
+        // Synchronous (not audioQueue.async) because the previous async
+        // path raced with first recordings: if the user pressed the
+        // hotkey before the queued block ran, the recording start fell
+        // back to creating a fresh VAD on the hot path — exactly the
+        // ~400 ms cost we wanted to avoid.
+        state.vad = SileroVAD()
     }
 
     private nonisolated func broadcastLevel(_ level: Float) {

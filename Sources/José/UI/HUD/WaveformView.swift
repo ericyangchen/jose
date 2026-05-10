@@ -1,84 +1,80 @@
 import SwiftUI
 
-/// 30 vertical bars whose heights are driven by recent RMS values. Each bar
-/// is painted with a horizontal sample of the Siri gradient (spec §4.2 / §4.6).
+/// Vertical bars whose heights track the recent RMS values, painted with
+/// the Siri gradient (spec §4.2 / §4.6).
 ///
-/// Wrapped in a TimelineView so SwiftUI guarantees a redraw on every frame
-/// even if the @Observable invalidation arrives a tick late — without it
-/// the bars freeze on shorter HUD pills where height changes between
-/// adjacent samples don't pass SwiftUI's diffing threshold.
+/// The previous implementation used `Canvas` inside a 60 Hz `TimelineView`
+/// plus a separate smoothing `Task` mutating an interpolated levels
+/// array — three competing redraw paths that fought on the main actor and
+/// produced visible frame drops at 60 Hz. The new implementation uses an
+/// `HStack` of `Capsule` shapes with `.animation(.easeOut, value: levels)`
+/// — SwiftUI animates each bar's height change natively and hardware-
+/// accelerated, with one redraw per push and no extra task overhead.
 struct WaveformView: View {
     let levels: [Float]
     let barCount: Int
 
-    private static let siriStops: [Color] = [
-        Color(red: 0.949, green: 0.659, blue: 0.769),
-        Color(red: 0.710, green: 0.659, blue: 0.910),
-        Color(red: 0.561, green: 0.737, blue: 0.910),
-        Color(red: 0.584, green: 0.863, blue: 0.875),
-    ]
-
     var body: some View {
-        TimelineView(.animation) { _ in
-            Canvas { context, size in
-                drawBars(context: context, size: size)
+        GeometryReader { geo in
+            let spacing: CGFloat = 2
+            let totalSpacing = spacing * CGFloat(barCount - 1)
+            let barWidth = max(1.5, (geo.size.width - totalSpacing) / CGFloat(barCount))
+            let height = geo.size.height
+            let baseline = max(2, height * 0.12)
+
+            HStack(alignment: .center, spacing: spacing) {
+                ForEach(0..<barCount, id: \.self) { index in
+                    Capsule(style: .continuous)
+                        .fill(color(at: index))
+                        .frame(width: barWidth, height: barHeight(at: index, max: height, baseline: baseline))
+                }
             }
+            .frame(width: geo.size.width, height: height, alignment: .center)
         }
+        // Animation outlasts the inter-push interval (~250 ms) so the
+        // bars are always interpolating — never frozen mid-frame waiting
+        // for the next sample. easeOut feels like a VU meter snap.
+        .animation(.easeOut(duration: 0.22), value: levels)
     }
 
-    private func drawBars(context: GraphicsContext, size: CGSize) {
-        guard barCount > 0 else { return }
-        let spacing: CGFloat = 2
-        let totalSpacing = spacing * CGFloat(barCount - 1)
-        let barWidth = max(1.5, (size.width - totalSpacing) / CGFloat(barCount))
-        let midY = size.height / 2
-
-        // Floor every bar at ~12% of the pill height so silence still
-        // shows a faint baseline (otherwise the waveform reads as "off"
-        // between syllables).
-        let minHeight = max(2, size.height * 0.12)
-
-        for index in 0..<barCount {
-            let level = level(at: index)
-            // Scale relative to pill height. log-style normalize is already
-            // baked into AudioLevelMonitor, so a linear map is right here.
-            let scaled = max(minHeight, CGFloat(level) * size.height)
-            let height = min(size.height, scaled)
-            let x = CGFloat(index) * (barWidth + spacing)
-            let rect = CGRect(x: x, y: midY - height / 2, width: barWidth, height: height)
-            let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-            let t = barCount == 1 ? 0 : Double(index) / Double(barCount - 1)
-            context.fill(path, with: .color(sampleSiri(at: t)))
-        }
-    }
+    // MARK: - Per-bar level lookup (right-aligned, newest at the right)
 
     private func level(at index: Int) -> Float {
-        guard !levels.isEmpty else { return 0.06 }
-        // Right-align: newest sample at the rightmost bar, older samples slide left.
+        guard !levels.isEmpty else { return 0 }
         let offset = barCount - levels.count
         let mapped = index - offset
-        guard mapped >= 0, mapped < levels.count else { return 0.06 }
+        guard mapped >= 0, mapped < levels.count else { return 0 }
         return levels[mapped]
     }
 
-    private func sampleSiri(at t: Double) -> Color {
+    private func barHeight(at index: Int, max maxHeight: CGFloat, baseline: CGFloat) -> CGFloat {
+        let value = level(at: index)
+        let scaled = CGFloat(value) * maxHeight
+        return min(maxHeight, max(baseline, scaled))
+    }
+
+    // MARK: - Per-bar color (precomputed Siri-gradient sample by position)
+
+    private static let siriStops: [(red: Double, green: Double, blue: Double)] = [
+        (0.949, 0.659, 0.769),
+        (0.710, 0.659, 0.910),
+        (0.561, 0.737, 0.910),
+        (0.584, 0.863, 0.875),
+    ]
+
+    private func color(at index: Int) -> Color {
+        let t: Double = barCount <= 1 ? 0 : Double(index) / Double(barCount - 1)
         let stops = Self.siriStops
-        let clamped = max(0, min(1, t))
-        let scaled = clamped * Double(stops.count - 1)
+        let scaled = max(0, min(1, t)) * Double(stops.count - 1)
         let lower = Int(scaled.rounded(.down))
         let upper = min(stops.count - 1, lower + 1)
         let frac = scaled - Double(lower)
-        return stops[lower].interpolated(toward: stops[upper], by: frac)
-    }
-}
-
-private extension Color {
-    func interpolated(toward other: Color, by amount: Double) -> Color {
-        let a = NSColor(self).usingColorSpace(.sRGB) ?? .white
-        let b = NSColor(other).usingColorSpace(.sRGB) ?? .white
-        let r = a.redComponent + (b.redComponent - a.redComponent) * amount
-        let g = a.greenComponent + (b.greenComponent - a.greenComponent) * amount
-        let bl = a.blueComponent + (b.blueComponent - a.blueComponent) * amount
-        return Color(red: r, green: g, blue: bl)
+        let a = stops[lower]
+        let b = stops[upper]
+        return Color(
+            red: a.red + (b.red - a.red) * frac,
+            green: a.green + (b.green - a.green) * frac,
+            blue: a.blue + (b.blue - a.blue) * frac
+        )
     }
 }

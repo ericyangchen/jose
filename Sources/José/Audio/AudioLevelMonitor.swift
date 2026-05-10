@@ -49,12 +49,17 @@ final class AudioLevelMonitor {
         return sqrtf(mean)
     }
 
-    /// Map raw RMS (~0...0.3 for normal speech) to a perceptual 0...1 range.
-    /// Uses a simple log curve clamped at the ends.
+    /// Map raw RMS (~0.02–0.3 for normal speech) to a perceptual 0...1
+    /// range with a log curve. The window is tuned to expand the
+    /// dynamic range of normal speech: very quiet rooms map near 0,
+    /// loud syllables hit ~0.9, and the difference between an "uhh"
+    /// and a stressed word is visibly different bar heights instead of
+    /// both bars saturating at the cap.
     static func normalize(rms: Float) -> Float {
         guard rms > 1e-6 else { return 0 }
         let db = 20 * log10f(rms)            // ~ -120 ... 0
-        let normalized = (db + 60) / 60      // -60 dB → 0, 0 dB → 1
+        // -55 dB (very quiet room) → 0, -10 dB (loud speech) → 1.
+        let normalized = (db + 55) / 45
         return max(0, min(1, normalized))
     }
 }

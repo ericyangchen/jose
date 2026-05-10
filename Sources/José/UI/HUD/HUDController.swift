@@ -16,7 +16,6 @@ final class HUDController {
     private var hostingView: NSHostingView<HUDView>?
     private var levelTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
-    private var smoothingTask: Task<Void, Never>?
     private var hideTask: Task<Void, Never>?
     private var recordingStart: Date?
 
@@ -109,7 +108,6 @@ final class HUDController {
             model.pulse = true
             model.variant = .recording
             startTimer()
-            startSmoothingTick()
             consumeLevels(stream)
 
         case .processing:
@@ -134,32 +132,16 @@ final class HUDController {
         levelTask = nil
         timerTask?.cancel()
         timerTask = nil
-        smoothingTask?.cancel()
-        smoothingTask = nil
-    }
-
-    /// Drives WaveformView's smooth bar interpolation at ~60 Hz. The
-    /// model's `levels` array holds *target* heights (updated at ~7 Hz
-    /// by consumeLevels); `displayedLevels` is what the view reads, and
-    /// each tick eases it toward `levels`. This is what makes voice peaks
-    /// glide rather than snap.
-    private func startSmoothingTick() {
-        smoothingTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(16))  // ~60 Hz
-                guard !Task.isCancelled else { break }
-                await MainActor.run { self?.model.tickSmoothing() }
-            }
-        }
     }
 
     private func consumeLevels(_ stream: AsyncStream<Float>) {
         // Audio levels arrive at ~33 Hz (one per 30 ms chunk). Throttle
-        // to ~3 Hz — peak energy across each ~330 ms window — so the
-        // 24-bar buffer fills over ~8 s of speech. The smoothing tick
-        // (60 Hz, see startSmoothingTick) eases between samples so the
-        // bars still glide rather than stepping every 330 ms.
-        let groupSize = 11
+        // to ~4 Hz — peak energy across each ~250 ms window. Combined
+        // with 30 bars, the waveform fills over ~7.5 s but each push
+        // arrives every 250 ms — short enough that the 220 ms easeOut
+        // animation never finishes before the next sample, so bars
+        // glide continuously instead of stop-starting every step.
+        let groupSize = 8
         levelTask = Task { [weak self] in
             var bucket: [Float] = []
             bucket.reserveCapacity(groupSize)
