@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 
 enum Logger {
-    static let subsystem = "com.eric.jose"
+    static let subsystem = "com.ericyangchen.jose"
 
     static let app = OSLog(subsystem: subsystem, category: "app")
     static let coordinator = OSLog(subsystem: subsystem, category: "coordinator")

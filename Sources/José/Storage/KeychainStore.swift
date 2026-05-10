@@ -13,9 +13,9 @@ enum KeychainError: Error, LocalizedError {
 }
 
 /// Thin wrapper around Security's generic-password keychain items.
-/// All José secrets share `service = "com.eric.jose"`, distinguished by `account`.
+/// All José secrets share `service = "com.ericyangchen.jose"`, distinguished by `account`.
 enum KeychainStore {
-    static let service = "com.eric.jose"
+    static let service = "com.ericyangchen.jose"
 
     enum Account {
         static let openAIAPIKey = "openai_api_key"

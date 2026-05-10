@@ -44,7 +44,7 @@ cp -R "$ARCHIVE_PATH/Products/Applications/José.app" "$EXPORT_PATH/"
 # bundle a coherent identity TCC will actually persist grants against.
 echo "Re-signing ad-hoc with stable identifier..."
 codesign --force --deep --sign - \
-    --identifier com.eric.jose \
+    --identifier com.ericyangchen.jose \
     --options runtime \
     --entitlements Resources/José.entitlements \
     "$EXPORT_PATH/José.app"

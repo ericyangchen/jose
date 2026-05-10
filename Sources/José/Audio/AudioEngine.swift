@@ -80,7 +80,7 @@ final class AudioEngine {
     // MARK: - Private state (touched only on `audioQueue`)
 
     private nonisolated(unsafe) var state = State()
-    private nonisolated let audioQueue = DispatchQueue(label: "com.eric.jose.audio", qos: .userInteractive)
+    private nonisolated let audioQueue = DispatchQueue(label: "com.ericyangchen.jose.audio", qos: .userInteractive)
 
     private struct State {
         var engine: AVAudioEngine?

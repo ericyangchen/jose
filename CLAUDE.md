@@ -42,7 +42,7 @@ These are decisions the author has explicitly committed to. Don't "improve" them
 4. **Settings UI is custom, not the standard SwiftUI `Settings` scene.** Sidebar (180pt) + card-stack content. The author paid for this — don't shortcut it with a stock `Form`.
 5. **Default vocabulary stays generic / dev-friendly.** Do not personalize defaults to the author; the app is meant to be shared. Spec §6.4.4.
 6. **No telemetry, no analytics, no third-party server, no always-on listening, no wake word, no cloud sync, no translation.** Permanently out of scope (handoff §2.5, spec §2.4).
-7. **Bundle id is `com.eric.jose`.** Pre-decided so the eventual signed/notarized build is a drop-in upgrade.
+7. **Bundle id is `com.ericyangchen.jose`.** Pre-decided so the eventual signed/notarized build is a drop-in upgrade.
 8. **`gpt-4o-transcribe` is the default model**, not `whisper-1`. Same price, materially better on zh-tw/en code-switching.
 
 ## Recommended implementation order
