@@ -59,9 +59,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // First-launch onboarding (BYOK flow). Skips itself + invokes the
         // completion synchronously if a key is already present.
+        let isFirstLaunch = (Defaults.bool(for: .onboardingCompleted) ?? false) == false
         onboardingWindow.showIfNeeded { [weak self] in
             self?.coordinator.onboardingFinished()
             self?.requestAllPermissionsAtLaunch()
+
+            // First-time users land in Settings right after the BYOK flow
+            // so they can rebind the hotkey, pick a model, etc. before
+            // they go hunting for it. Returning users skip — Settings is
+            // a click away in the menu-bar dropdown.
+            if isFirstLaunch {
+                self?.settingsWindow.show()
+            }
         }
     }
 
