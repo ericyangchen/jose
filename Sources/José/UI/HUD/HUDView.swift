@@ -62,37 +62,32 @@ struct HUDView: View {
     }
 
     private var recordingContent: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Circle()
                 .fill(Color(red: 1.0, green: 0.353, blue: 0.353))
-                .frame(width: 10, height: 10)
+                .frame(width: 7, height: 7)
                 .opacity(model.pulse ? 1.0 : 0.6)
                 .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: model.pulse)
 
             WaveformView(levels: model.levels, barCount: HUDViewModel.barCount)
-                .frame(height: 32)
+                .frame(height: 18)
 
             Text(formatTimer(model.elapsed))
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
         }
     }
 
     private var processingContent: some View {
-        HStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.small)
-                .progressViewStyle(.circular)
-            Text("Transcribing…")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
-        }
+        ProgressView()
+            .controlSize(.small)
+            .progressViewStyle(.circular)
     }
 
     private func messageContent(_ message: String, color: Color) -> some View {
         Text(message)
-            .font(.system(size: 13, weight: .medium))
+            .font(.system(size: 11, weight: .medium))
             .foregroundStyle(color)
             .lineLimit(1)
             .truncationMode(.tail)

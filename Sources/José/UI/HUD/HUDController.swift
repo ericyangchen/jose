@@ -20,7 +20,7 @@ final class HUDController {
     private var recordingStart: Date?
 
     private let bottomMargin: CGFloat = 120
-    private let height: CGFloat = 56
+    private let height: CGFloat = 36
 
     init() {}
 
@@ -183,11 +183,14 @@ final class HUDController {
     private func currentSize(for variant: HUDVariant) -> NSSize {
         switch variant {
         case .recording:
-            return NSSize(width: 280, height: height)
-        case .processing:
             return NSSize(width: 200, height: height)
+        case .processing:
+            // Just a tiny spinner pill — no text. The user said the
+            // "Transcribing…" copy was both redundant and made the HUD
+            // feel slow / heavy.
+            return NSSize(width: height, height: height)
         case .error, .notice:
-            return NSSize(width: 240, height: height)
+            return NSSize(width: 200, height: height)
         }
     }
 
