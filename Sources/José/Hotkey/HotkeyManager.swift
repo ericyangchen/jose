@@ -30,6 +30,7 @@ final class HotkeyManager {
 
         bind(slot: .A)
         bind(slot: .B)
+        observeSettings()
     }
 
     func stop() {
@@ -42,10 +43,39 @@ final class HotkeyManager {
         modifiers.removeAll()
     }
 
-    /// Re-binding strategy: call stop() + start() after Settings changes.
-    /// We deliberately do not observe Settings here — the Settings UI is the
-    /// only mutator and it can drive the cycle explicitly when the user
-    /// commits a change, keeping ownership of lifecycle in one place.
+    /// Tear down the active bindings and re-build them from the current
+    /// settings. Called automatically when the user changes a hotkey or
+    /// mode in the Settings UI (see `observeSettings`).
+    private func rebind() {
+        for combo in combos.values { combo.stop() }
+        for modifier in modifiers.values { modifier.stop() }
+        combos.removeAll()
+        modifiers.removeAll()
+        bind(slot: .A)
+        bind(slot: .B)
+    }
+
+    /// `withObservationTracking` fires its onChange exactly once per
+    /// arming. Re-arm after every change so subsequent edits in Settings
+    /// also trigger a rebind.
+    private func observeSettings() {
+        withObservationTracking {
+            // Touch every binding-related setting so the tracker covers
+            // all of them.
+            _ = settings.hotkeyAModifierMask
+            _ = settings.hotkeyBModifierMask
+            _ = settings.hotkeyAMode
+            _ = settings.hotkeyBMode
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.started else { return }
+                Logger.hotkey.info("settings changed — rebinding hotkeys")
+                self.rebind()
+                self.observeSettings()
+            }
+        }
+    }
+
     private func bind(slot: HotkeySlot) {
         let mask = self.mask(for: slot)
         let mode = self.mode(for: slot)
