@@ -14,134 +14,117 @@
 - **Two hotkeys, two behaviors.**
   - **A** — *Transcribe & Paste:* writes the transcript to the clipboard, then synthesizes ⌘V at the cursor.
   - **B** — *Transcribe & Copy:* writes to the clipboard only.
-- **Hold-to-talk OR toggle.** Per-hotkey choice. Right Option is the default for A in hold mode.
-- **Native menu-bar app, no Dock icon.** Floating pill HUD shows recording state + waveform.
-- **BYOK.** Your OpenAI key stays in the macOS Keychain. Your audio goes directly to OpenAI; no third-party server in the middle.
-- **No telemetry. No always-on listening.** Hotkey-triggered, zero in the background.
+- **Hold-to-talk OR toggle.** Per-hotkey choice. **Fn (globe key)** is the default for slot A in hold mode.
+- **Native menu-bar app, no Dock icon.** Floating Dynamic-Island-style pill shows recording state, animated waveform, elapsed timer, then a 3-dot processing indicator.
+- **BYOK.** Your OpenAI key stays in the macOS Keychain. Audio goes directly to OpenAI; no third-party server.
+- **No telemetry, no always-on listening.** Hotkey-triggered, zero in the background.
 
-## Requirements
+---
 
-- macOS 14 (Sonoma) or later — Apple Silicon recommended
-- [Xcode 15+](https://apps.apple.com/us/app/xcode/id497799835) (the build is unsigned, so you'll archive locally)
-- An OpenAI API key with access to `gpt-4o-transcribe` ([create one](https://platform.openai.com/api-keys))
+## Install (for users)
 
-## Building
+### 1. Download
 
-One-time setup (installs `xcodegen` if needed and generates the project):
+Grab `José-<version>.zip` from the [Releases page](https://github.com/REPLACE_ME/jose/releases) and unzip it. Drag `José.app` into `/Applications/`.
 
-```bash
-./Scripts/setup.sh
-open José.xcodeproj
-# In Xcode: Product → Archive → Distribute App → Copy App
-```
+### 2. Bypass Gatekeeper (one-time)
 
-Or, fully scripted (unsigned archive + zip + SHA-256):
-
-```bash
-./Scripts/release.sh
-# → .build/release/José-0.1.0.zip
-```
-
-Drop `José.app` into `/Applications/`.
-
-### First launch — Gatekeeper bypass
-
-The build is unsigned, so macOS will refuse to open it the first time. To bypass:
+The build is unsigned — Apple Developer Program costs $99/yr and José doesn't pay it. macOS will refuse to open it the first time. Run this once:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/José.app
 ```
 
-…or right-click the app → **Open** → confirm the warning.
+Or right-click the app in Finder → **Open** → confirm the warning dialog.
 
-### Permissions José will ask for
+### 3. First launch — BYOK + permissions
 
-| Permission | Why | When |
-|---|---|---|
-| **Microphone** | Capture your voice | First time you press a hotkey |
-| **Accessibility** | Synthesize ⌘V into the focused app | First time hotkey A fires |
-| **Input Monitoring** | Listen for global hotkeys | First launch |
+When you launch José for the first time:
 
-If you missed a prompt, José deep-links you to the right page in System Settings → Privacy & Security.
+1. **Welcome window** asks for your OpenAI API key. Paste it (you can [create one here](https://platform.openai.com/api-keys)) and click **Test** — José validates against `/v1/models`. Click **Save**; the key goes into your macOS Keychain.
+2. **Settings opens automatically** so you can rebind the hotkey, pick a model, configure spoken languages, etc. Close it whenever you're ready.
+3. macOS will prompt for **Microphone** and **Accessibility** permissions on first hotkey press. Grant both — Microphone to capture your voice, Accessibility so José can synthesize ⌘V into the focused app.
 
-## Setup
+### 4. Use it
 
-1. Launch José. The menu-bar icon appears (three small bars).
-2. The onboarding window asks for your OpenAI API key. Paste it, click **Test** (José hits `/v1/models` to verify), then **Save**.
-3. Open Settings (menu bar → **Settings…**) to bind hotkeys, choose a model, or edit the vocabulary.
+Hold the hotkey (default **Fn**), speak (mix Chinese and English freely), release. Within ~3 seconds your transcript is pasted at the cursor.
 
-## Usage
+> **Heads up about the Fn key**: System Settings → Keyboard → "Press 🌐 key to" needs to be set to **"Do Nothing"** or **"Change Input Source"**. If it's set to "Show Emoji & Symbols" or "Start Dictation," that'll fight José's hold-to-talk. You can also rebind to a different key in Settings → Hotkeys.
 
-### Default bindings
+---
 
-| Action | Hotkey | Mode |
-|---|---|---|
-| Transcribe & Paste (slot A) | Right Option | Hold-to-talk |
-| Transcribe & Copy (slot B) | *unset — bind one in Settings* | Hold-to-talk |
+## Settings overview
 
-### The recording loop
+Click the menu-bar icon → **Settings…** to open the configuration window.
 
-```
-Press hotkey → HUD pill appears with waveform → speak →
-release hotkey → HUD shows "Transcribing…" → text is pasted (or copied)
-```
+| Pane | What's there |
+|---|---|
+| **General** | Launch at login, show in Dock, show usage estimate in dropdown |
+| **Hotkeys** | Bind slot A and B; pick hold or toggle mode |
+| **Audio** | Choose a non-default microphone |
+| **Transcription** | Pick `gpt-4o-transcribe` ($0.36/hr) or `gpt-4o-mini-transcribe` ($0.18/hr); set spoken languages; edit system prompt; replace API key |
+| **Vocabulary** | Toggle dev categories or add custom terms |
+| **Permissions** | Live status of Microphone, Accessibility, and (optional) Input Monitoring |
+| **About** | Version + license |
 
-Press **Esc** during recording or processing to cancel without uploading.
-
-### Limits
-
-- Soft limit: 2 minutes (HUD shows "Long recording…")
-- Hard limit: 10 minutes (auto-stop + upload)
-- Recordings under 0.5 s are silently discarded
-- Recordings with no detected speech (< 5 % of frames) are discarded with a "No speech detected" notice
-
-### Cost estimation
-
-The menu-bar dropdown shows a rolling monthly minutes / cost estimate. José tracks audio seconds per model locally and multiplies by the public OpenAI rates — accurate to within a few percent. This is *not* synced with your real OpenAI billing dashboard; the **estimated** label in the dropdown is intentional.
+---
 
 ## Privacy
 
-- **Bring Your Own Key.** Your OpenAI key is stored in the macOS Keychain. Used only to call OpenAI directly.
+- **Bring Your Own Key.** Your OpenAI API key sits in your macOS Keychain. It's used only to call OpenAI directly; no third-party server.
 - **No telemetry, no analytics, no crash reporter.** No code in this app phones home.
-- **Audio uploaded to OpenAI for transcription.** The temp `.m4a` file is deleted as soon as the response is in. OpenAI's API terms (distinct from ChatGPT's) state that API data is not used for training by default — see the OpenAI Data Usage policy if you want the source.
-- **Transcripts stay in your clipboard** so tools like [Raycast](https://www.raycast.com/) clipboard history can pick them up. The default is *not* to restore the previous clipboard contents — toggle "Restore previous clipboard" in Settings → Output if you'd rather.
+- **Audio uploaded to OpenAI for transcription.** The temp `.m4a` file is deleted as soon as the response arrives. OpenAI's API terms (distinct from ChatGPT's) state that API data is not used for training by default.
+- **Transcripts stay in your clipboard** so tools like [Raycast](https://www.raycast.com/) clipboard history can pick them up. Toggle "Restore previous clipboard" in Settings → Output if you'd rather not.
+
+---
+
+## Building from source (for contributors)
+
+```bash
+git clone https://github.com/REPLACE_ME/jose.git
+cd jose
+./Scripts/setup.sh        # installs xcodegen via brew, generates José.xcodeproj
+open José.xcodeproj       # ⌘R to run; Product → Archive to ship
+```
+
+To produce a release zip ready to upload to GitHub:
+
+```bash
+./Scripts/release.sh
+# → .build/release/José-<version>.zip + SHA-256
+```
+
+To regenerate the Silero VAD Core ML model (only needed if you're updating to a newer Silero release — the conversion script requires Python 3.12; coremltools 8.x's native libs don't ship for 3.13 yet):
+
+```bash
+./Scripts/convert_silero.sh
+```
+
+---
 
 ## Known limitations (v1)
 
-- **Silero VAD ships as an RMS fallback.** The Core ML conversion pipeline (coremltools 8.x) is currently incompatible with Silero's torchscript export. RMS-based silence detection is good enough for the "no speech detected" warning the spec requires; real Silero is queued for v1.1. The conversion script is in [Scripts/convert_silero.sh](Scripts/convert_silero.sh) for whoever wants to iterate.
-- **No clipboard restore by default** — see Privacy above. This is a feature, not a bug.
-- **Right Option may conflict with some keyboard layouts** (e.g., US-International when typing accented characters). Rebind to a different modifier in Settings → Hotkeys.
-- **Unsigned build.** Until the project gets a Developer ID, every fresh download needs the Gatekeeper bypass shown above.
+- **Unsigned build.** Until José gets a Developer ID, every fresh download needs the Gatekeeper bypass shown above.
+- **Right Option may conflict with some keyboard layouts** (US-International typing accented characters, Pinyin, etc.). Fn is the default for that reason; rebind in Settings → Hotkeys if you need.
+- **Esc-to-cancel during recording requires Input Monitoring permission**, which macOS auto-denies for ad-hoc-signed builds. Recording itself works fine without it; only the cancel shortcut is disabled.
+- **Streaming transcription is v1.1.** Current transcription is the batch endpoint — typically 2–4 s after release. The Realtime API path (~500 ms latency) is the next major upgrade.
+
+---
 
 ## Roadmap
 
-- **v1.1** — Streaming transcription via `/v1/realtime` so partial text shows up as you speak; real Silero VAD; auto-update via Sparkle.
-- **v2** — A third hotkey that runs the transcript through `gpt-4o-mini` for filler-removal and tone polish before pasting; per-app prompt presets; optional local history.
+- **v1.1** — Streaming transcription via `/v1/realtime`; partial-text HUD; Sparkle auto-update
+- **v2** — `gpt-4o-mini` post-process pass to clean filler words; per-app prompt presets; optional local history
 
-See the design spec for the full picture.
+---
 
-## Development
+## Contributing
 
-```
-Sources/José/
-├── App/            # AppDelegate, SwiftUI @main, AppCoordinator state machine
-├── Core/           # AppState enum, Settings, Logger, ModifierMask constants
-├── Storage/        # KeychainStore, UserDefaults wrapper
-├── Hotkey/         # ComboHotkey (KeyboardShortcuts) + ModifierHotkey (flagsChanged)
-├── Audio/          # AVAudioEngine pipeline → m4a + RMS + Silero VAD
-├── Transcription/  # /v1/audio/transcriptions multipart client + PromptBuilder
-├── Output/         # NSPasteboard + CGEvent ⌘V
-├── Permissions/    # Mic + Accessibility + Input Monitoring
-├── Usage/          # Local minutes/cost tracking
-├── UI/MenuBar/     # NSStatusItem + Canvas-rendered icon (4 states)
-├── UI/HUD/         # Floating pill panel + Siri-gradient waveform
-├── UI/Settings/    # Custom NSWindow with sidebar + 6 panes
-└── UI/Onboarding/  # First-launch BYOK flow
-```
-
-The whole project follows a strictly observable pattern: `AppCoordinator` is the only state owner. Subsystems either *publish* (audio levels, hotkey events) or *consume* (HUD, menu-bar icon) `AppStateModel`. There's no global mutable state and no Combine — everything's `async/await` + `@Observable`.
-
-The hotkey subsystem has two implementations behind one façade because macOS has no single API that handles both Carbon-style combos *and* single-modifier hold/release. See `Sources/José/Hotkey/` and design spec §6.1 for the gory bits.
+PRs welcome. Code style:
+- Swift 5.10+, SwiftUI primary with AppKit bridges
+- macOS 14+ deployment target
+- `async/await`, no Combine for new code
+- One test pass before pushing: `xcodegen generate && xcodebuild -scheme José -configuration Debug build`
 
 ## License
 
