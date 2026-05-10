@@ -23,7 +23,7 @@ final class HUDViewModel {
     var elapsed: TimeInterval = 0
     var pulse: Bool = false
 
-    static let barCount = 30
+    static let barCount = 16
 
     func pushLevel(_ value: Float) {
         let clamped = max(0, min(1, value))
@@ -103,22 +103,22 @@ struct HUDView: View {
     }
 
     private var recordingContent: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Circle()
                 .fill(Color(red: 1.0, green: 0.353, blue: 0.353))
-                .frame(width: 7, height: 7)
-                .opacity(model.pulse ? 1.0 : 0.6)
+                .frame(width: 5, height: 5)
+                .opacity(model.pulse ? 1.0 : 0.55)
                 .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: model.pulse)
 
             WaveformView(levels: model.levels, barCount: HUDViewModel.barCount)
-                .frame(height: 24)
+                .frame(height: 16)
 
             Text(formatTimer(model.elapsed))
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.system(size: 10, weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
     }
 
     private var processingContent: some View {
@@ -132,11 +132,11 @@ struct HUDView: View {
 
     private func messageContent(_ message: String, color: Color) -> some View {
         Text(message)
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
             .foregroundStyle(color)
             .lineLimit(1)
             .truncationMode(.tail)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
     }
 
     private func formatTimer(_ seconds: TimeInterval) -> String {

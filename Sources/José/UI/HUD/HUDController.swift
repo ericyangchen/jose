@@ -22,9 +22,10 @@ final class HUDController {
     private let bottomMargin: CGFloat = 120
     /// Inner pill height. The window is bigger by 2× haloBleed so the
     /// gradient glow has a tiny halo of empty pixels to fade into.
-    /// Smaller bleed keeps the soft bloom from reaching the rectangular
-    /// window edge (which would clip it and make the corners look square).
-    private let height: CGFloat = 42
+    /// Sized to feel like the iPhone Dynamic Island in its compact state —
+    /// small enough to disappear from peripheral vision, big enough to
+    /// host the dot + waveform + timer.
+    private let height: CGFloat = 30
     private static let haloBleed: CGFloat = 3
 
     init() {}
@@ -220,14 +221,12 @@ final class HUDController {
         let bleed = Self.haloBleed * 2
         switch variant {
         case .recording:
-            return NSSize(width: 200 + bleed, height: height + bleed)
+            return NSSize(width: 150 + bleed, height: height + bleed)
         case .processing:
-            // Just a tiny spinner pill — no text. The user said the
-            // "Transcribing…" copy was both redundant and made the HUD
-            // feel slow / heavy.
+            // Tiny circular spinner puck — width = height for a true circle.
             return NSSize(width: height + bleed, height: height + bleed)
         case .error, .notice:
-            return NSSize(width: 200 + bleed, height: height + bleed)
+            return NSSize(width: 150 + bleed, height: height + bleed)
         }
     }
 
