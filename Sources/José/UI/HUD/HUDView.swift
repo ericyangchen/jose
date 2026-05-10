@@ -45,7 +45,6 @@ struct HUDView: View {
             content
                 .padding(.horizontal, 20)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -53,16 +52,12 @@ struct HUDView: View {
         switch model.variant {
         case .recording:
             recordingContent
-                .transition(.opacity)
         case .processing:
             processingContent
-                .transition(.opacity)
         case .error(let message):
             messageContent(message, color: Color(red: 0.922, green: 0.341, blue: 0.341))
-                .transition(.opacity)
         case .notice(let message):
             messageContent(message, color: .secondary)
-                .transition(.opacity)
         }
     }
 
@@ -75,7 +70,6 @@ struct HUDView: View {
                 .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: model.pulse)
 
             WaveformView(levels: model.levels, barCount: HUDViewModel.barCount)
-                .frame(maxWidth: .infinity)
                 .frame(height: 32)
 
             Text(formatTimer(model.elapsed))

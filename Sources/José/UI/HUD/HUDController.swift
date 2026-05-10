@@ -32,12 +32,36 @@ final class HUDController {
         let panel = ensureWindow()
         let isFirstShow = !panel.isVisible
 
+        // Resize the window FIRST, then update the SwiftUI model. If the
+        // model changes before the window is resized, SwiftUI lays out the
+        // new variant inside the old window's bounds, asks for more space
+        // than it has, and we kick off a constraint-feedback pass.
+        positionWindowForVariant(panel, variant: variant(for: presentation))
         applyPresentation(presentation)
-        positionWindow(panel)
 
         if isFirstShow {
             animateIn(panel)
         }
+    }
+
+    private func variant(for presentation: HUDPresentation) -> HUDVariant {
+        switch presentation {
+        case .recording: .recording
+        case .processing: .processing
+        case .error(let m): .error(m)
+        case .notice(let m): .notice(m)
+        }
+    }
+
+    private func positionWindowForVariant(_ panel: HUDWindow, variant: HUDVariant) {
+        let screen = activeScreen() ?? NSScreen.main ?? panel.screen ?? NSScreen.screens.first
+        guard let screen else { return }
+
+        let size = currentSize(for: variant)
+        let frame = screen.visibleFrame
+        let originX = frame.midX - size.width / 2
+        let originY = frame.minY + bottomMargin
+        panel.setFrame(NSRect(x: originX, y: originY, width: size.width, height: size.height), display: false)
     }
 
     func hide() {
@@ -55,38 +79,36 @@ final class HUDController {
     private func applyPresentation(_ presentation: HUDPresentation) {
         cancelStreams()
 
+        // Plain assignments — no withAnimation. The SwiftUI animation
+        // wrapper kicks the hosting view into a constraint-update pass that
+        // races with the panel's setFrame, eventually tripping AppKit's
+        // "more constraint passes than views" guard and crashing the app.
+        // Visual continuity comes from the .transition modifiers on each
+        // variant view + the explicit window cross-fade in show().
         switch presentation {
         case .recording(let stream):
             model.resetLevels()
             recordingStart = Date()
             model.elapsed = 0
             model.pulse = true
-            withAnimation(.easeInOut(duration: 0.2)) {
-                model.variant = .recording
-            }
+            model.variant = .recording
             startTimer()
             consumeLevels(stream)
 
         case .processing:
             recordingStart = nil
             model.pulse = false
-            withAnimation(.easeInOut(duration: 0.2)) {
-                model.variant = .processing
-            }
+            model.variant = .processing
 
         case .error(let message):
             recordingStart = nil
             model.pulse = false
-            withAnimation(.easeInOut(duration: 0.2)) {
-                model.variant = .error(message)
-            }
+            model.variant = .error(message)
 
         case .notice(let message):
             recordingStart = nil
             model.pulse = false
-            withAnimation(.easeInOut(duration: 0.2)) {
-                model.variant = .notice(message)
-            }
+            model.variant = .notice(message)
         }
     }
 
@@ -129,22 +151,29 @@ final class HUDController {
         let initialSize = currentSize(for: model.variant)
         let panel = HUDWindow(contentRect: NSRect(origin: .zero, size: initialSize))
 
-        let hosting = NSHostingView(rootView: HUDView(model: model))
-        hosting.frame = NSRect(origin: .zero, size: initialSize)
-        hosting.autoresizingMask = [.width, .height]
+        // Plain NSView wrapper isolates the panel's content layout from
+        // the SwiftUI subtree's Auto Layout. NSHostingView directly as
+        // contentView trips:
+        //
+        //   NSGenericException: The window has been marked as needing
+        //   another Update Constraints in Window pass...
+        //
+        // every time the SwiftUI variant changes — its constraint
+        // invalidation propagates back up through the window. Putting a
+        // plain NSView in between absorbs those passes since it has no
+        // constraints of its own.
+        let wrapper = NSView(frame: NSRect(origin: .zero, size: initialSize))
+        wrapper.autoresizingMask = [.width, .height]
 
-        // Stop SwiftUI from publishing an intrinsic content size back to
-        // AppKit. The HUDView's outer frame uses .infinity to fill the
-        // window, which without this flag drives NSHostingView to report
-        // greatestFiniteMagnitude as its preferred width — AppKit then
-        // tries to grow the window to fit, the SwiftUI view re-fills,
-        // and the loop trips
-        // `NSGenericException: ...needing another Update Constraints in
-        // Window pass`.
+        let hosting = NSHostingView(rootView: HUDView(model: model))
+        hosting.frame = wrapper.bounds
+        hosting.autoresizingMask = [.width, .height]
         if #available(macOS 13.0, *) {
             hosting.sizingOptions = []
         }
-        panel.contentView = hosting
+        wrapper.addSubview(hosting)
+
+        panel.contentView = wrapper
 
         self.window = panel
         self.hostingView = hosting
