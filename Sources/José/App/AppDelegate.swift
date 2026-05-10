@@ -46,13 +46,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // cost on the hot path.
         hudController.warmUp()
 
-        // Request Input Monitoring *before* the hotkey manager installs
-        // any global event listeners — that's the OS's signal to register
-        // José in the System Settings → Privacy → Input Monitoring list.
-        // Calling it after `addGlobalMonitorForEvents` doesn't always
-        // trigger the registration on macOS 14+, which is why the row
-        // sometimes never appears in System Settings.
-        _ = PermissionsCoordinator.shared.requestInputMonitoring()
+        // Note: we deliberately do *not* call requestInputMonitoring()
+        // at launch. macOS auto-denies IOHIDRequestAccess for ad-hoc-
+        // signed builds without showing a dialog, leaving the badge
+        // stuck on "Denied" with no actionable state for the user.
+        // Recording works without IM (modifier-key flagsChanged events
+        // pass through without it on macOS 14+); only Esc-to-cancel
+        // requires it. The Permissions pane has the explicit Request
+        // button + drag-to-list workaround for users who want Esc cancel.
 
         coordinator.start()
 

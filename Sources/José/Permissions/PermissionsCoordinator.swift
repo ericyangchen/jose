@@ -26,7 +26,7 @@ enum SystemPermission: String, CaseIterable, Identifiable {
         case .accessibility:
             "Required to paste the transcript at your cursor (synthesizes ⌘V into the focused app)."
         case .inputMonitoring:
-            "Required to listen for the global hotkey while José is in the background."
+            "Optional. Only used for the Esc-to-cancel shortcut while recording. The hotkey itself works without it."
         }
     }
 
