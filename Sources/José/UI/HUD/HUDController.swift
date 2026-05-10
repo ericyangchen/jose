@@ -20,7 +20,10 @@ final class HUDController {
     private var recordingStart: Date?
 
     private let bottomMargin: CGFloat = 120
+    /// Inner pill height. The window is bigger by 2× haloBleed so the
+    /// gradient glow has room to extend past the pill edge.
     private let height: CGFloat = 36
+    private static let haloBleed: CGFloat = 8
 
     init() {}
 
@@ -181,16 +184,17 @@ final class HUDController {
     }
 
     private func currentSize(for variant: HUDVariant) -> NSSize {
+        let bleed = Self.haloBleed * 2
         switch variant {
         case .recording:
-            return NSSize(width: 200, height: height)
+            return NSSize(width: 200 + bleed, height: height + bleed)
         case .processing:
             // Just a tiny spinner pill — no text. The user said the
             // "Transcribing…" copy was both redundant and made the HUD
             // feel slow / heavy.
-            return NSSize(width: height, height: height)
+            return NSSize(width: height + bleed, height: height + bleed)
         case .error, .notice:
-            return NSSize(width: 200, height: height)
+            return NSSize(width: 200 + bleed, height: height + bleed)
         }
     }
 
