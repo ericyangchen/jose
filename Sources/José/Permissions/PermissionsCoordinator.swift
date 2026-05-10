@@ -143,11 +143,22 @@ final class PermissionsCoordinator {
     /// Triggers the Input Monitoring system prompt. Only shows once per
     /// process. After granting, the app must be restarted for the OS to
     /// honor it for global event listeners.
+    ///
+    /// We call this *before* installing any global event listeners so the
+    /// OS gets a chance to register José in the Input Monitoring privacy
+    /// list at a known time. Some macOS versions only add the app to the
+    /// list after the first IOHIDRequestAccess call (not on the
+    /// `addGlobalMonitorForEvents` call alone), so calling this proactively
+    /// matters even when the hotkey monitor would technically work without
+    /// the permission.
     @discardableResult
     func requestInputMonitoring() -> PermissionStatus {
+        let beforeStatus = currentInputMonitoringStatus()
         let result = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         refresh()
-        Logger.permissions.info("input monitoring requested → \(result ? "granted" : "denied/pending")")
+        Logger.permissions.info(
+            "input monitoring requested → result=\(result), before=\(String(describing: beforeStatus)), after=\(String(describing: self.inputMonitoring))"
+        )
         return inputMonitoring
     }
 

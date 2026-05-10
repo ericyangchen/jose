@@ -40,6 +40,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         coordinator.bindUI(hud: hudController, statusItem: statusItemController)
+
+        // Request Input Monitoring *before* the hotkey manager installs
+        // any global event listeners — that's the OS's signal to register
+        // José in the System Settings → Privacy → Input Monitoring list.
+        // Calling it after `addGlobalMonitorForEvents` doesn't always
+        // trigger the registration on macOS 14+, which is why the row
+        // sometimes never appears in System Settings.
+        _ = PermissionsCoordinator.shared.requestInputMonitoring()
+
         coordinator.start()
 
         // First-launch onboarding (BYOK flow). Skips itself + invokes the

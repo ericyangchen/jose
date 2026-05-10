@@ -20,14 +20,15 @@ struct PermissionsPane: View {
 
             SettingsCard {
                 VStack(spacing: 16) {
-                    ForEach(SystemPermission.allCases) { perm in
+                    let allPerms = SystemPermission.allCases
+                    ForEach(Array(allPerms.enumerated()), id: \.element.id) { index, perm in
                         PermissionRow(
                             permission: perm,
                             status: permissions.status(for: perm),
                             onOpen: { permissions.openSystemSettings(for: perm) },
                             onRetry: { handleRetry(for: perm) }
                         )
-                        if perm != SystemPermission.allCases.last {
+                        if index < allPerms.count - 1 {
                             Divider()
                         }
                     }
