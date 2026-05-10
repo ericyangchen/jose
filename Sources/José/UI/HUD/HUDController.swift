@@ -29,11 +29,21 @@ final class HUDController {
 
     func show(_ presentation: HUDPresentation) {
         Logger.hud.debug("show: \(String(describing: presentation))")
+        let wasFading = hideTask != nil
         hideTask?.cancel()
         hideTask = nil
 
         let panel = ensureWindow()
         let isFirstShow = !panel.isVisible
+
+        // If we cancelled an animateOut mid-flight, the animator may have
+        // already driven alphaValue toward 0 / origin downward. Snap them
+        // back to a known-good state synchronously before any new animation
+        // so we don't end up visible-but-transparent.
+        if wasFading {
+            panel.animator().alphaValue = 1
+            panel.alphaValue = 1
+        }
 
         // Resize the window FIRST, then update the SwiftUI model. If the
         // model changes before the window is resized, SwiftUI lays out the
@@ -42,7 +52,7 @@ final class HUDController {
         positionWindowForVariant(panel, variant: variant(for: presentation))
         applyPresentation(presentation)
 
-        if isFirstShow {
+        if isFirstShow || wasFading {
             animateIn(panel)
         }
     }
