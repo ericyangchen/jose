@@ -89,6 +89,7 @@ private struct SettingsRootView: View {
         case .audio:         AudioPane(settings: settings)
         case .transcription: TranscriptionPane(settings: settings)
         case .vocabulary:    VocabularyPane(settings: settings)
+        case .permissions:   PermissionsPane(permissions: PermissionsCoordinator.shared)
         case .about:         AboutPane()
         }
     }

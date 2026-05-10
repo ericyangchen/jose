@@ -19,15 +19,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(policy)
 
         // Compose the dependency graph. Each subsystem is owned here and
-        // injected into AppCoordinator. Workers fill in implementations
-        // for the placeholder types referenced below.
+        // injected into AppCoordinator.
         self.coordinator = AppCoordinator(
             settings: Settings.shared,
             audioEngine: AudioEngine(),
             transcriptionClient: TranscriptionClient(),
             outputRouter: OutputRouter(),
             usageTracker: UsageTracker.shared,
-            permissions: PermissionsCoordinator()
+            permissions: PermissionsCoordinator.shared
         )
 
         self.hudController = HUDController()
@@ -43,20 +42,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.bindUI(hud: hudController, statusItem: statusItemController)
         coordinator.start()
 
-        // First-launch onboarding (BYOK flow). Skips itself if a key is
-        // already present.
+        // First-launch onboarding (BYOK flow). Skips itself + invokes the
+        // completion synchronously if a key is already present.
         onboardingWindow.showIfNeeded { [weak self] in
             self?.coordinator.onboardingFinished()
+            self?.requestAllPermissionsAtLaunch()
         }
+    }
 
-        // Trigger the Accessibility permission prompt at launch if it
-        // hasn't been granted. Without it, slot A's synthetic ⌘V silently
-        // no-ops — the user gets clipboard-only output and can't tell why.
-        // The system shows its native prompt the first time we call this
-        // per process; after the user grants in System Settings, restarts
-        // pick up the change.
-        if !PasteSimulator.isAuthorized {
-            PasteSimulator.requestAuthorizationPrompt()
+    /// Request mic + Accessibility + Input Monitoring upfront so the user
+    /// hits all the system dialogs in one batch on first launch instead of
+    /// being interrupted mid-recording. Each request is idempotent: the
+    /// system shows its dialog only when the permission is `.notDetermined`,
+    /// and the OS-side check is non-blocking.
+    private func requestAllPermissionsAtLaunch() {
+        let permissions = PermissionsCoordinator.shared
+
+        Task { @MainActor in
+            // 1. Microphone — async API; system shows its consent dialog if
+            // status is .notDetermined.
+            _ = await permissions.requestMicrophone()
+
+            // 2. Accessibility — synchronous prompt. Only shows once per
+            // process; only fires when AXIsProcessTrusted() is currently false.
+            permissions.requestAccessibilityPrompt()
+
+            // 3. Input Monitoring — only fires its dialog when status is
+            // .unknown / .notDetermined; harmless to call when already granted.
+            permissions.requestInputMonitoring()
         }
     }
 

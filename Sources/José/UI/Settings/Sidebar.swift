@@ -6,6 +6,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case audio
     case transcription
     case vocabulary
+    case permissions
     case about
 
     var id: String { rawValue }
@@ -17,6 +18,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .audio: "Audio"
         case .transcription: "Transcription"
         case .vocabulary: "Vocabulary"
+        case .permissions: "Permissions"
         case .about: "About"
         }
     }
@@ -28,6 +30,7 @@ enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .audio: "mic"
         case .transcription: "waveform"
         case .vocabulary: "text.book.closed"
+        case .permissions: "lock.shield"
         case .about: "info.circle"
         }
     }

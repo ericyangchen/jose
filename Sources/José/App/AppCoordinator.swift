@@ -121,9 +121,9 @@ final class AppCoordinator: HotkeyManagerDelegate {
     private func actuallyStartRecording(slot: HotkeySlot) async {
         guard case .arming = stateModel.state else { return }
 
-        if !permissions.microphoneAuthorized {
-            let granted = await permissions.requestMicrophone()
-            guard granted else {
+        if permissions.microphone != .granted {
+            let result = await permissions.requestMicrophone()
+            guard result == .granted else {
                 Logger.coordinator.warning("microphone permission denied")
                 stateModel.transition(to: .error(message: "Microphone access denied"))
                 hud?.show(.error(message: "Microphone access denied"))
