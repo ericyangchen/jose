@@ -55,19 +55,22 @@ struct HUDView: View {
 
     var body: some View {
         ZStack {
-            // The pill itself: frosted background + content.
+            // The pill itself: frosted background + content. We clip the
+            // whole inner ZStack to the capsule shape so during the
+            // recording → processing morph the (still-fading) recording
+            // content can't overflow past the shrinking pill silhouette.
             ZStack {
                 VisualEffectBackground()
-                    .clipShape(Capsule())
                     .opacity(0.86)
 
                 // Padding is per-variant — the recording pill needs side
                 // padding for its [dot, waveform, timer] HStack, but the
-                // 36×36 processing pill is too narrow for any horizontal
+                // 30×30 processing pill is too narrow for any horizontal
                 // padding (it'd squeeze the spinner into negative pixels
                 // and clip it to a sliver).
                 content
             }
+            .clipShape(Capsule())
             .padding(Self.haloBleed)
             .overlay(
                 Group {
@@ -93,12 +96,16 @@ struct HUDView: View {
         switch model.variant {
         case .recording:
             recordingContent
+                .transition(.opacity)
         case .processing:
             processingContent
+                .transition(.opacity)
         case .error(let message):
             messageContent(message, color: Color(red: 0.922, green: 0.341, blue: 0.341))
+                .transition(.opacity)
         case .notice(let message):
             messageContent(message, color: .secondary)
+                .transition(.opacity)
         }
     }
 

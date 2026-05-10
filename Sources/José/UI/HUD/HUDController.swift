@@ -45,25 +45,48 @@ final class HUDController {
 
         let panel = ensureWindow()
         let isFirstShow = !panel.isVisible
+        let oldVariant = model.variant
+        let newVariant = variant(for: presentation)
+        // Smooth morph when we're already visible and the variant changes —
+        // typically recording → processing (full pill compresses to spinner
+        // puck) or processing → notice (puck expands to message pill).
+        let morphing = !isFirstShow && !wasFading && oldVariant != newVariant
 
-        // If we cancelled an animateOut mid-flight, the animator may have
-        // already driven alphaValue toward 0 / origin downward. Snap them
-        // back to a known-good state synchronously before any new animation
-        // so we don't end up visible-but-transparent.
         if wasFading {
             panel.animator().alphaValue = 1
             panel.alphaValue = 1
         }
 
-        // Resize the window FIRST, then update the SwiftUI model. If the
-        // model changes before the window is resized, SwiftUI lays out the
-        // new variant inside the old window's bounds, asks for more space
-        // than it has, and we kick off a constraint-feedback pass.
-        positionWindowForVariant(panel, variant: variant(for: presentation))
-        applyPresentation(presentation)
+        if morphing {
+            morph(panel: panel, to: presentation)
+        } else {
+            positionWindowForVariant(panel, variant: newVariant)
+            applyPresentation(presentation, animated: false)
 
-        if isFirstShow || wasFading {
-            animateIn(panel)
+            if isFirstShow || wasFading {
+                animateIn(panel)
+            }
+        }
+    }
+
+    /// Animated transition between two visible variants. The panel frame
+    /// shrinks/expands while the SwiftUI content cross-fades inside the
+    /// pill — recording bars + timer fade out as the pill compresses to
+    /// a 30 × 30 puck, then the spinner fades in. Same applies in reverse
+    /// (processing → notice puck expands back to message pill).
+    private func morph(panel: HUDWindow, to presentation: HUDPresentation) {
+        let newVariant = variant(for: presentation)
+        let target = frameForVariant(newVariant, on: panel)
+
+        // Update SwiftUI variant inside withAnimation — content
+        // .transition(.opacity) modifiers cross-fade in step with the
+        // window's frame animation.
+        applyPresentation(presentation, animated: true)
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.30
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(target, display: true)
         }
     }
 
@@ -76,15 +99,20 @@ final class HUDController {
         }
     }
 
-    private func positionWindowForVariant(_ panel: HUDWindow, variant: HUDVariant) {
+    private func frameForVariant(_ variant: HUDVariant, on panel: HUDWindow) -> NSRect {
         let screen = activeScreen() ?? NSScreen.main ?? panel.screen ?? NSScreen.screens.first
-        guard let screen else { return }
-
         let size = currentSize(for: variant)
+        guard let screen else {
+            return NSRect(origin: panel.frame.origin, size: size)
+        }
         let frame = screen.visibleFrame
         let originX = frame.midX - size.width / 2
         let originY = frame.minY + bottomMargin
-        panel.setFrame(NSRect(x: originX, y: originY, width: size.width, height: size.height), display: false)
+        return NSRect(x: originX, y: originY, width: size.width, height: size.height)
+    }
+
+    private func positionWindowForVariant(_ panel: HUDWindow, variant: HUDVariant) {
+        panel.setFrame(frameForVariant(variant, on: panel), display: false)
     }
 
     func hide() {
@@ -99,39 +127,50 @@ final class HUDController {
 
     // MARK: - Presentation routing
 
-    private func applyPresentation(_ presentation: HUDPresentation) {
+    /// `animated` controls whether the variant change runs inside a
+    /// `withAnimation` block — true for in-place morphs between visible
+    /// variants (so the SwiftUI .transition(.opacity) on each variant
+    /// content cross-fades), false for first-show / hide-then-show paths
+    /// where the morph isn't visible anyway.
+    private func applyPresentation(_ presentation: HUDPresentation, animated: Bool) {
         cancelStreams()
 
-        // Plain assignments — no withAnimation. The SwiftUI animation
-        // wrapper kicks the hosting view into a constraint-update pass that
-        // races with the panel's setFrame, eventually tripping AppKit's
-        // "more constraint passes than views" guard and crashing the app.
-        // Visual continuity comes from the .transition modifiers on each
-        // variant view + the explicit window cross-fade in show().
+        // Compute the new variant + side-effect mutations first; only the
+        // model.variant assignment goes inside withAnimation so SwiftUI's
+        // animation system stays narrowly scoped to the content swap.
+        let newVariant: HUDVariant
         switch presentation {
         case .recording(let stream):
             model.resetLevels()
             recordingStart = Date()
             model.elapsed = 0
             model.pulse = true
-            model.variant = .recording
+            newVariant = .recording
             startTimer()
             consumeLevels(stream)
 
         case .processing:
             recordingStart = nil
             model.pulse = false
-            model.variant = .processing
+            newVariant = .processing
 
         case .error(let message):
             recordingStart = nil
             model.pulse = false
-            model.variant = .error(message)
+            newVariant = .error(message)
 
         case .notice(let message):
             recordingStart = nil
             model.pulse = false
-            model.variant = .notice(message)
+            newVariant = .notice(message)
+        }
+
+        if animated {
+            withAnimation(.easeInOut(duration: 0.30)) {
+                model.variant = newVariant
+            }
+        } else {
+            model.variant = newVariant
         }
     }
 
