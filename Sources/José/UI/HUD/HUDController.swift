@@ -115,6 +115,16 @@ final class HUDController {
         panel.setFrame(frameForVariant(variant, on: panel), display: false)
     }
 
+    /// Mutates the model directly instead of going through `show()`.
+    /// Re-showing `.recording` would run `applyPresentation`, which calls
+    /// `resetLevels()` and zeroes `elapsed` — the waveform and timer would
+    /// visibly restart at the exact moment the user latches.
+    func setLatched(_ latched: Bool) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            model.latched = latched
+        }
+    }
+
     func hide() {
         Logger.hud.debug("hide")
         cancelStreams()
@@ -357,6 +367,7 @@ final class HUDController {
                 panel.orderOut(nil)
                 panel.alphaValue = 1
                 self?.model.resetLevels()
+                self?.model.latched = false
             }
         }
     }

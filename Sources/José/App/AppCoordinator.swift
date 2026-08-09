@@ -32,6 +32,18 @@ final class AppCoordinator: HotkeyManagerDelegate {
     private var softLimitTask: Task<Void, Never>?
     private var escapeMonitor: Any?
 
+    /// Latched recording: the user pressed Control during a hold, so
+    /// releasing the hotkey no longer stops the recording. Kept out of
+    /// `AppState` deliberately — the enum is Equatable and pattern-matched
+    /// at a dozen sites, and the HUD is told explicitly rather than
+    /// inferring. See docs/superpowers/specs/2026-08-08-latched-recording-design.md
+    private var isLatched: Bool = false
+
+    /// Set on the un-latching press so Control can't re-latch before the
+    /// user releases. Without it, stopping with Fn+Ctrl would un-latch on
+    /// the Fn down and then latch straight back on the Ctrl down.
+    private var suppressLatchUntilRelease: Bool = false
+
     /// Spec §6.1.3 — short hold-mode taps are dropped so a stray finger graze
     /// doesn't trigger an upload.
     private let armingDelay: Duration = .milliseconds(50)
@@ -85,12 +97,59 @@ final class AppCoordinator: HotkeyManagerDelegate {
 
     func hotkeyDidGoDown(_ slot: HotkeySlot) {
         Logger.coordinator.debug("hotkey \(slot.rawValue) down")
+        if isLatched, stateModel.state.isRecording, stateModel.state.slot == slot {
+            // Re-attach the hold. This press starts nothing; the release
+            // that follows is what stops the recording.
+            Logger.coordinator.debug("hotkey \(slot.rawValue) un-latched")
+            setLatched(false)
+            suppressLatchUntilRelease = true
+            return
+        }
         beginRecording(slot: slot)
     }
 
     func hotkeyDidGoUp(_ slot: HotkeySlot) {
         Logger.coordinator.debug("hotkey \(slot.rawValue) up")
+        if isLatched, stateModel.state.isRecording, stateModel.state.slot == slot {
+            // Latched — the user let go on purpose. Keep recording.
+            return
+        }
         finishRecording(slot: slot)
+    }
+
+    func hotkeyDidLatch(_ slot: HotkeySlot) {
+        guard !suppressLatchUntilRelease, !isLatched else { return }
+        guard stateModel.state.slot == slot else { return }
+        // `.arming` counts: ModifierHotkey's 50 ms graze filter and this
+        // coordinator's 50 ms arming delay run back to back, so a latch
+        // can land ~100 ms before the state reaches .recording.
+        switch stateModel.state {
+        case .arming, .recording:
+            Logger.coordinator.debug("hotkey \(slot.rawValue) latched")
+            setLatched(true)
+        default:
+            break
+        }
+    }
+
+    func hotkeyBindingsWillChange() {
+        guard isLatched else { return }
+        guard stateModel.state.isRecording, let slot = stateModel.state.slot else {
+            setLatched(false)
+            suppressLatchUntilRelease = false
+            return
+        }
+        // Finish rather than cancel — the user has already said something
+        // worth keeping, and the alternative is a recording that runs until
+        // the hard limit with no bound key able to stop it.
+        Logger.coordinator.info("hotkey rebind during a latched recording — finishing it")
+        finishRecording(slot: slot)
+    }
+
+    private func setLatched(_ latched: Bool) {
+        guard isLatched != latched else { return }
+        isLatched = latched
+        hud?.setLatched(latched)
     }
 
     func hotkeyDidFire(_ slot: HotkeySlot) {
@@ -108,6 +167,9 @@ final class AppCoordinator: HotkeyManagerDelegate {
 
     private func beginRecording(slot: HotkeySlot) {
         guard !stateModel.state.isBusy else { return }
+        // A fresh recording never inherits a latch.
+        setLatched(false)
+        suppressLatchUntilRelease = false
         stateModel.transition(to: .arming(slot: slot, since: .now))
 
         armingTask?.cancel()
@@ -171,6 +233,26 @@ final class AppCoordinator: HotkeyManagerDelegate {
     }
 
     private func finishRecording(slot: HotkeySlot) {
+        // A stray second call must not clobber work that's already moved
+        // past recording. Two ways to get one: the hard limit auto-stops a
+        // latched recording and the user only then releases the hotkey, or
+        // an error is surfaced while the key is still held. Both used to
+        // force .idle and hide the HUD out from under an in-flight
+        // transcription. Exhaustive on purpose — a new AppState case should
+        // fail to compile until someone decides which side it belongs on.
+        switch stateModel.state {
+        case .idle, .arming, .recording:
+            break
+        case .processing, .delivering, .error:
+            Logger.coordinator.debug("finishRecording ignored — already \(String(describing: self.stateModel.state))")
+            return
+        }
+
+        // Covers every exit: hotkey release, hard limit, and the bail-out
+        // path when the release lands during arming.
+        setLatched(false)
+        suppressLatchUntilRelease = false
+
         armingTask?.cancel()
         hardLimitTask?.cancel()
         softLimitTask?.cancel()
@@ -322,6 +404,9 @@ final class AppCoordinator: HotkeyManagerDelegate {
     // MARK: - Cancel via Esc
 
     func cancel() {
+        setLatched(false)
+        suppressLatchUntilRelease = false
+
         armingTask?.cancel()
         hardLimitTask?.cancel()
         softLimitTask?.cancel()

@@ -8,6 +8,12 @@ protocol HotkeyManagerDelegate: AnyObject {
     /// Toggle-mode hotkeys only emit "fired" — the manager translates this
     /// into a synthetic down/up pair based on current recording state.
     func hotkeyDidFire(_ slot: HotkeySlot)
+    /// Control was pressed during a hold-mode press. The recording should
+    /// keep running after the hotkey is released.
+    func hotkeyDidLatch(_ slot: HotkeySlot)
+    /// The current bindings are about to be torn down and rebuilt. Any
+    /// recording that outlives its hotkey needs to be settled first.
+    func hotkeyBindingsWillChange()
 }
 
 @MainActor
@@ -47,6 +53,11 @@ final class HotkeyManager {
     /// settings. Called automatically when the user changes a hotkey or
     /// mode in the Settings UI (see `observeSettings`).
     private func rebind() {
+        // Before the old bindings disappear. A latched recording survives
+        // its hotkey's release, so if we tear the binding down without
+        // warning it can end up running with no key left to stop it.
+        delegate?.hotkeyBindingsWillChange()
+
         for combo in combos.values { combo.stop() }
         for modifier in modifiers.values { modifier.stop() }
         combos.removeAll()
@@ -88,7 +99,8 @@ final class HotkeyManager {
                 mode: modifierMode,
                 onDown: { [weak self] s in self?.delegate?.hotkeyDidGoDown(s) },
                 onUp: { [weak self] s in self?.delegate?.hotkeyDidGoUp(s) },
-                onFire: { [weak self] s in self?.delegate?.hotkeyDidFire(s) }
+                onFire: { [weak self] s in self?.delegate?.hotkeyDidFire(s) },
+                onLatch: { [weak self] s in self?.delegate?.hotkeyDidLatch(s) }
             )
             hotkey.start()
             modifiers[slot] = hotkey

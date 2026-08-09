@@ -37,10 +37,13 @@ struct HotkeysPane: View {
             }
 
             SettingsCard("Tip") {
-                Text("Single-modifier hotkeys (Right Option, Right Command, etc.) work in either Hold or Toggle mode. Combo hotkeys only support Toggle mode — Carbon's hotkey API doesn't expose key-up events.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Single-modifier hotkeys (Right Option, Right Command, etc.) work in either Hold or Toggle mode. Combo hotkeys only support Toggle mode — Carbon's hotkey API doesn't expose key-up events.")
+                    Text("In Hold mode, press Control at any point while the hotkey is down to latch the recording — a lock appears in the pill and you can let go and keep talking. Press the hotkey again and release it to stop. Not available when Control itself is the hotkey.")
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

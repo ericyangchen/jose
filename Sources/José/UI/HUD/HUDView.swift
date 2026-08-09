@@ -22,6 +22,11 @@ final class HUDViewModel {
     var levels: [Float] = []
     var elapsed: TimeInterval = 0
     var pulse: Bool = false
+    /// Recording continues with the hotkey released (Control was pressed
+    /// during the hold). Swaps the pill's leading dot for a lock glyph.
+    /// Deliberately untouched by `HUDController.applyPresentation` so it
+    /// survives the soft-limit notice → recording re-show.
+    var latched: Bool = false
 
     static let barCount = 26
 
@@ -109,13 +114,33 @@ struct HUDView: View {
         }
     }
 
-    private var recordingContent: some View {
-        HStack(spacing: 6) {
+    /// Recording-red, shared by the pulsing dot and the latched lock glyph.
+    private static let recordingRed = Color(red: 1.0, green: 0.353, blue: 0.353)
+
+    /// Leading indicator. Pulses while the hotkey is physically held;
+    /// becomes a static lock once latched — there's no key being held to
+    /// pulse along with, and the glyph is what tells the user the release
+    /// gesture is now "press and release again".
+    @ViewBuilder
+    private var recordingIndicator: some View {
+        if model.latched {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(Self.recordingRed)
+                .transition(.opacity)
+        } else {
             Circle()
-                .fill(Color(red: 1.0, green: 0.353, blue: 0.353))
+                .fill(Self.recordingRed)
                 .frame(width: 5, height: 5)
                 .opacity(model.pulse ? 1.0 : 0.55)
                 .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: model.pulse)
+                .transition(.opacity)
+        }
+    }
+
+    private var recordingContent: some View {
+        HStack(spacing: 6) {
+            recordingIndicator
 
             WaveformView(levels: model.levels, barCount: HUDViewModel.barCount)
                 .frame(height: 16)

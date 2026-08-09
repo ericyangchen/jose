@@ -14,6 +14,24 @@ final class ModifierHotkey {
     private let onDown: (HotkeySlot) -> Void
     private let onUp: (HotkeySlot) -> Void
     private let onFire: (HotkeySlot) -> Void
+    private let onLatch: (HotkeySlot) -> Void
+
+    /// Public `NSEvent.ModifierFlags.control` bit. Unlike the hotkey masks
+    /// themselves — which need the `NX_DEVICE*` bits to tell left from
+    /// right — the latch key doesn't care which Control was pressed, so
+    /// the public bit is both simpler and independent of device-bit layout.
+    private static let controlFlag: UInt = NSEvent.ModifierFlags.control.rawValue
+
+    /// Device bits for either Control key, used only to detect the
+    /// degenerate case where Control *is* the hotkey.
+    private static let controlMaskBits: UInt = ModifierMask.leftControl | ModifierMask.rightControl
+
+    /// Latching only makes sense in hold mode (toggle is already
+    /// hands-free), and only when the hotkey itself isn't a Control key —
+    /// otherwise the latch key would be the hotkey.
+    private var latchEnabled: Bool {
+        mode == .hold && (mask & Self.controlMaskBits) == 0
+    }
 
     /// Spec §3.4 / §6.1.3 — short taps under 50 ms are silently dropped so a
     /// stray finger graze never starts an upload.
@@ -32,7 +50,8 @@ final class ModifierHotkey {
         mode: Mode,
         onDown: @escaping (HotkeySlot) -> Void,
         onUp: @escaping (HotkeySlot) -> Void,
-        onFire: @escaping (HotkeySlot) -> Void
+        onFire: @escaping (HotkeySlot) -> Void,
+        onLatch: @escaping (HotkeySlot) -> Void
     ) {
         self.slot = slot
         self.mask = mask
@@ -40,6 +59,7 @@ final class ModifierHotkey {
         self.onDown = onDown
         self.onUp = onUp
         self.onFire = onFire
+        self.onLatch = onLatch
     }
 
     func start() {
@@ -97,6 +117,14 @@ final class ModifierHotkey {
             handleDown()
         } else if bitWasSet && !bitIsSet {
             handleUp()
+        } else if latchEnabled, isDown,
+                  (prev & Self.controlFlag) == 0,
+                  (flags & Self.controlFlag) != 0 {
+            // Control pressed while the hotkey is held — latch the
+            // recording so the user can let go and keep talking. The
+            // reverse order (Control already held when the hotkey goes
+            // down) is handled in handleDown's arming task.
+            onLatch(slot)
         }
     }
 
@@ -143,6 +171,12 @@ final class ModifierHotkey {
                 guard let self else { return }
                 self.isDown = true
                 self.onDown(slot)
+                // Order-insensitive latching: Control already held when
+                // the hotkey went down (or pressed during the arming
+                // window, before isDown was set) latches too.
+                if self.latchEnabled, (self.lastFlags & Self.controlFlag) != 0 {
+                    self.onLatch(slot)
+                }
             }
         }
     }
