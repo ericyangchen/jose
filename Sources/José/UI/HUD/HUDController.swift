@@ -283,49 +283,12 @@ final class HUDController {
         }
     }
 
-    private func positionWindow(_ panel: HUDWindow) {
-        let screen = activeScreen() ?? NSScreen.main ?? panel.screen ?? NSScreen.screens.first
-        guard let screen else { return }
-
-        let size = currentSize(for: model.variant)
-        let frame = screen.visibleFrame
-        let originX = frame.midX - size.width / 2
-        let originY = frame.minY + bottomMargin
-        panel.setFrame(NSRect(x: originX, y: originY, width: size.width, height: size.height), display: true)
-    }
-
+    /// The screen under the mouse cursor. Focused-window lookup via AX put
+    /// the pill on the wrong display when the frontmost app's window sat on
+    /// another monitor than the Space the user was looking at.
     private func activeScreen() -> NSScreen? {
-        let frontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        if let frontPID {
-            let app = AXUIElementCreateApplication(frontPID)
-            var windowRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-               let window = windowRef {
-                var posValue: CFTypeRef?
-                var sizeValue: CFTypeRef?
-                AXUIElementCopyAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, &posValue)
-                AXUIElementCopyAttributeValue(window as! AXUIElement, kAXSizeAttribute as CFString, &sizeValue)
-
-                var origin = CGPoint.zero
-                var size = CGSize.zero
-                if let posValue {
-                    AXValueGetValue(posValue as! AXValue, .cgPoint, &origin)
-                }
-                if let sizeValue {
-                    AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
-                }
-                let center = CGPoint(x: origin.x + size.width / 2, y: origin.y + size.height / 2)
-                if let match = NSScreen.screens.first(where: { screen in
-                    // AX coords are top-left origin; convert to bottom-left to compare with NSScreen.frame.
-                    let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
-                    let flipped = CGPoint(x: center.x, y: primaryHeight - center.y)
-                    return screen.frame.contains(flipped)
-                }) {
-                    return match
-                }
-            }
-        }
-        return NSScreen.main
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
     }
 
     // MARK: - Animations
